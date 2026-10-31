@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vino</title>
+<meta name="theme-color" content="#6E1F33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vino">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF0EC; --surface:#F8F9F6; --ink:#232021; --muted:#62605E; --line:#CDD1C8;
+  --wine:#6E1F33; --wine-soft:#E9D9DD; --vine:#56633F; --on-wine:#F8F9F6;
+  --serif:"Cormorant Garamond", "Iowan Old Style", Georgia, serif;
+  --sans:"Instrument Sans", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#17131A; --surface:#221C25; --ink:#ECE6E8; --muted:#A79DA3; --line:#3A3140;
+    --wine:#D58A9C; --wine-soft:#3A2330; --vine:#A5B686; --on-wine:#17131A; color-scheme:dark; }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans);-webkit-font-smoothing:antialiased;
+  padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--paper);z-index:10}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--wine);outline-offset:2px}
+img{max-width:100%;display:block}
+main{max-width:640px;margin:0 auto;padding:12px 18px 24px}
+h1{font:600 2.6rem/1 var(--serif);margin:14px 0 4px;letter-spacing:-.01em}
+h2{font:600 1.7rem/1.1 var(--serif);margin:24px 0 8px}
+h3{font:600 1.05rem/1.3 var(--sans);margin:18px 0 6px}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+
+/* tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;align-items:flex-end;padding:6px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+nav.tabs button{background:none;border:0;padding:6px 4px;min-width:60px;color:var(--muted);font-size:.78rem;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button[aria-current="page"]{color:var(--wine);font-weight:600}
+nav.tabs svg{width:24px;height:24px}
+nav.tabs .scan{background:var(--wine);color:var(--on-wine);border-radius:50%;width:62px;height:62px;min-width:0;margin-top:-26px;justify-content:center;
+  box-shadow:0 0 0 5px var(--paper)}
+nav.tabs .scan span{display:none}
+nav.tabs .scan svg{width:28px;height:28px}
+
+/* cellar list */
+.bottle{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);
+  background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left}
+.bottle img,.bottle .ph{width:64px;height:84px;object-fit:cover;border-radius:6px;background:var(--wine-soft)}
+.bottle .name{font:600 1.35rem/1.1 var(--serif)}
+.bottle .meta{font-size:.85rem;color:var(--muted)}
+.stars-static{color:var(--wine);font-size:.85rem;letter-spacing:1px}
+.empty{padding:40px 8px;text-align:center}
+.empty .big{font:500 1.6rem/1.2 var(--serif);margin-bottom:8px}
+
+/* buttons */
+.btn{border:1px solid var(--wine);background:var(--wine);color:var(--on-wine);border-radius:999px;padding:10px 18px;font-weight:600}
+.btn.ghost{background:none;color:var(--wine)}
+.btn.quiet{border-color:var(--line);background:none;color:var(--ink);font-weight:500}
+.btn.danger{background:none;border-color:var(--line);color:#B3261E}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* forms */
+label.f{display:block;margin:12px 0 4px;font-size:.85rem;color:var(--muted)}
+input[type=text],input[type=search],input[type=number],select,textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{min-height:80px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stars{display:flex;gap:4px}
+.stars button{background:none;border:0;font-size:1.8rem;line-height:1;color:var(--line);padding:2px}
+.stars button.on{color:var(--wine)}
+
+/* scan */
+.photo{border-radius:12px;overflow:hidden;background:var(--wine-soft);margin:8px 0 12px}
+.photo img{width:100%;max-height:360px;object-fit:cover}
+.progress{height:4px;background:var(--line);border-radius:4px;overflow:hidden;margin:8px 0}
+.progress i{display:block;height:100%;width:0;background:var(--wine);transition:width .2s}
+.match{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0}
+.match.sel{border-color:var(--wine);box-shadow:inset 0 0 0 1px var(--wine)}
+.match .t{font:600 1.2rem/1.15 var(--serif)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.chip{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:.85rem;background:var(--surface)}
+button.chip{color:var(--wine);border-color:var(--wine)}
+
+/* detail */
+.hero-photo{margin:0 -18px;max-height:420px;overflow:hidden;background:var(--wine-soft)}
+.hero-photo img{width:100%;max-height:420px;object-fit:cover}
+.producer{font-size:.95rem;color:var(--muted);margin-top:14px}
+.vintage{font:500 1.4rem/1 var(--serif);color:var(--wine)}
+dl.facts{display:grid;grid-template-columns:7.5em 1fr;gap:6px 12px;margin:14px 0}
+dl.facts dt{color:var(--muted);font-size:.875rem;padding-top:2px}
+dl.facts dd{margin:0}
+.note{background:var(--surface);border-left:3px solid var(--vine);padding:10px 14px;border-radius:0 8px 8px 0;margin:10px 0}
+a.link,button.link{color:var(--wine);background:none;border:0;padding:0;text-decoration:underline;text-underline-offset:2px}
+
+/* dictionary */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface);margin:10px 0}
+.seg button{border:0;background:none;padding:6px 16px;border-radius:999px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--wine);color:var(--on-wine);font-weight:600}
+.dict-item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 0}
+.dict-item .t{font:600 1.25rem/1.15 var(--serif)}
+.country{font:500 italic 1.1rem var(--serif);color:var(--vine);margin:18px 0 0}
+
+
+/* maps */
+.minimap{height:170px;border-radius:12px;overflow:hidden;background:var(--wine-soft);margin:10px 0 4px;position:relative}
+.minimap .open{position:absolute;right:8px;bottom:8px;z-index:2;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:.8rem;color:var(--ink)}
+.map-full{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);bottom:calc(78px + env(safe-area-inset-bottom,0px));background:var(--wine-soft)}
+.map-canvas{width:100%;height:100%}
+.map-bar{position:absolute;top:10px;left:12px;right:12px;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none}
+.map-bar > *{pointer-events:auto}
+.map-bar .seg{margin:0;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.map-msg{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+.pin{width:16px;height:16px;border-radius:50%;background:var(--wine);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer}
+.pin.count{width:auto;min-width:26px;height:26px;padding:0 7px;display:grid;place-items:center;color:#fff;font:600 .8rem/1 var(--sans);border-radius:999px}
+.pin.region{background:var(--vine);width:12px;height:12px}
+.maplibregl-popup-content{font:15px/1.4 var(--sans);color:#232021;border-radius:12px;padding:10px 14px;max-width:240px}
+.maplibregl-popup-content .t{font:600 1.15rem/1.15 var(--serif)}
+.maplibregl-popup-content button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid #ddd;padding:6px 0;color:#232021}
+.maplibregl-popup-content button:first-of-type{border-top:0}
+@media (prefers-color-scheme: dark){ .pin{border-color:#17131A} }
+
+/* sheet */
+.sheet-back{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30;display:none}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--paper);border-radius:18px 18px 0 0;max-height:85vh;overflow:auto;
+  padding:8px 20px calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .25s ease,visibility 0s .25s;visibility:hidden}
+.sheet.open{transform:none;visibility:visible;transition:transform .25s ease}
+.sheet .grab{width:40px;height:4px;border-radius:4px;background:var(--line);margin:4px auto 6px}
+.sheet-inner{max-width:600px;margin:0 auto}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:8px 16px;border-radius:999px;font-size:.9rem;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){.sheet{transition:none}.progress i{transition:none}}
+</style>
+</head>
+<body>
+<main id="view" aria-live="polite"></main>
+
+<nav class="tabs" aria-label="Sections">
+  <button data-tab="cellar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 2h6M10 2v5c-2 1-3 2.5-3 5v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9c0-2.5-1-4-3-5V2"/><path d="M7 13h10"/></svg><span>Cellar</span></button>
+  <button data-tab="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s-6-5.3-6-11a6 6 0 0 1 12 0c0 5.7-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg><span>Map</span></button>
+  <button data-tab="scan" class="scan" aria-label="Scan a bottle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg><span>Scan</span></button>
+  <button data-tab="dict"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg><span>Dictionary</span></button>
+  <button data-tab="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span></button>
+</nav>
+
+<div class="sheet-back" id="sheetBack"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="sheet-inner" id="sheetInner"></div></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+<input type="file" id="csvInput" accept=".csv,text/csv" hidden>
+<input type="file" id="backupInput" accept=".json,application/json" hidden>
+
+<script src="dict.js"></script>
+<script>
+"use strict";
+const CDN = {
+  tesseract: "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js",
+  worker: "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js",
+  core: "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0",
+  lang: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+  papa: "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js",
+  maplibre: "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js",
+  maplibreCss: "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css",
+  mapStyle: "https://tiles.openfreemap.org/styles/positron"
+};
+const REGIONS = window.VINO_REGIONS, GRAPES = window.VINO_GRAPES;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = s => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+const title = s => String(s || "").toLowerCase().replace(/(^|[\s\-'])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+
+/* ---------- storage (IndexedDB) ---------- */
+let dbp;
+function db() {
+  return dbp ??= new Promise((res, rej) => {
+    const r = indexedDB.open("vino", 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore("bottles", { keyPath: "id" });
+      d.createObjectStore("wines", { keyPath: "id" });
+      d.createObjectStore("meta");
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function tx(store, mode, fn) {
+  const d = await db();
+  return new Promise((res, rej) => {
+    const t = d.transaction(store, mode), s = t.objectStore(store);
+    let out; const r = fn(s);
+    if (r) r.onsuccess = () => (out = r.result);
+    t.oncomplete = () => res(out);
+    t.onerror = () => rej(t.error);
+  });
+}
+const allBottles = () => tx("bottles", "readonly", s => s.getAll());
+const getBottle = id => tx("bottles", "readonly", s => s.get(id));
+const putBottle = b => tx("bottles", "readwrite", s => s.put(b));
+const delBottle = id => tx("bottles", "readwrite", s => s.delete(id));
+const getMeta = k => tx("meta", "readonly", s => s.get(k));
+const setMeta = (k, v) => tx("meta", "readwrite", s => s.put(v, k));
+
+/* ---------- GitHub sync (private data repo) ---------- */
+// Layout in the repo: bottles/<id>.json (details + small thumbnail) and photos/<id>.jpg.
+// The token is stored on this device only.
+async function saveBottle(b) {
+  await putBottle({ ...b, updated: Date.now(), dirty: true });
+  syncSoon();
+}
+async function removeBottle(id) {
+  const b = await getBottle(id);
+  await delBottle(id);
+  if (b?.remoteSha) { const t = await getMeta("tombstones") || {}; t[id] = { sha: b.remoteSha, photo: !!b.photoSynced }; await setMeta("tombstones", t); }
+  syncSoon();
+}
+const b64utf8 = str => { const bytes = new TextEncoder().encode(str); let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(bin); };
+const utf8b64 = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, "")), c => c.charCodeAt(0)));
+async function gh(cfg, path, opts = {}) {
+  const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}${path}`, {
+    ...opts, cache: "no-store",
+    headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opts.body ? { "Content-Type": "application/json" } : {}) }
+  });
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.message || `GitHub error ${res.status}`); e.status = res.status; throw e; }
+  return data;
+}
+async function ghPut(cfg, path, contentB64, message, sha) {
+  const r = await gh(cfg, `/contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: contentB64, branch: cfg.branch, ...(sha ? { sha } : {}) }) });
+  return r.content.sha;
+}
+async function ghGetFile(cfg, path) { return gh(cfg, `/contents/${path}?ref=${encodeURIComponent(cfg.branch)}`); }
+// Accepts https://github.com/owner/repo, github.com/owner/repo/tree/main, git@github.com:owner/repo.git or owner/repo.
+function parseRepo(input) {
+  const v = String(input || "").trim().replace(/\.git$/, "").replace(/\/+$/, "");
+  const m = v.match(/^(?:https?:\/\/)?(?:www\.)?github\.com[\/:]([\w.-]+)\/([\w.-]+)/i) || v.match(/^git@github\.com:([\w.-]+)\/([\w.-]+)/i) || v.match(/^([\w.-]+)\/([\w.-]+)$/);
+  return m ? { owner: m[1], repo: m[2].replace(/\.git$/, "") } : null;
+}
+async function testSync(cfg) {
+  const info = await gh(cfg, "");
+  if (!info.permissions?.push) throw new Error("This token can read the repo but not write to it. Give it Contents: Read and write.");
+  if (!info.private) throw new Error("This repo is public. Use a private repo for your bottles.");
+  return info.default_branch || "main";
+}
+let syncing = null, syncTimer = null;
+function syncSoon() { clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow().catch(() => {}), 1500); }
+async function syncNow(manual) {
+  if (syncing) return syncing;
+  const cfg = await getMeta("sync");
+  if (!cfg?.token) return;
+  if (!navigator.onLine) { if (manual) toast("Offline. Changes will sync later."); return; }
+  syncing = (async () => {
+    let pulled = 0, pushed = 0;
+    // 1. What's in the repo now
+    let tree = [];
+    try { tree = (await gh(cfg, `/git/trees/${encodeURIComponent(cfg.branch)}?recursive=1`)).tree || []; }
+    catch (e) { if (e.status !== 409 && e.status !== 404) throw e; } // empty repo
+    const remote = {}, photos = new Set();
+    for (const t of tree) {
+      let m = t.path.match(/^bottles\/(.+)\.json$/); if (m) remote[m[1]] = t.sha;
+      m = t.path.match(/^photos\/(.+)\.jpg$/); if (m) photos.add(m[1]);
+    }
+    const tomb = await getMeta("tombstones") || {};
+    // 2. Deletions made on this phone
+    for (const [id, t] of Object.entries(tomb)) {
+      try {
+        if (remote[id]) await gh(cfg, `/contents/bottles/${id}.json`, { method: "DELETE", body: JSON.stringify({ message: `Delete bottle ${id}`, sha: remote[id], branch: cfg.branch }) });
+        if (photos.has(id)) { const f = await ghGetFile(cfg, `photos/${id}.jpg`); await gh(cfg, `/contents/photos/${id}.jpg`, { method: "DELETE", body: JSON.stringify({ message: `Delete photo ${id}`, sha: f.sha, branch: cfg.branch }) }); }
+      } catch (e) { if (e.status !== 404) throw e; }
+      delete remote[id]; photos.delete(id); delete tomb[id]; await setMeta("tombstones", tomb);
+    }
+    // 3. Pull new or changed bottles, drop ones deleted elsewhere
+    const local = await allBottles() || [];
+    const byId = Object.fromEntries(local.map(b => [b.id, b]));
+    for (const [id, sha] of Object.entries(remote)) {
+      const lb = byId[id];
+      if (lb && lb.remoteSha === sha) {
+        // A linked photo (e.g. from Vivino) that the repo now holds a copy of: keep the copy on the phone.
+        if (lb.photo && !lb.photo.startsWith("data:") && photos.has(id)) {
+          const f = await ghGetFile(cfg, `photos/${id}.jpg`);
+          if (f.content) { const photo = "data:image/jpeg;base64," + f.content.replace(/\s/g, ""); await putBottle({ ...lb, photo, thumb: await makeThumb(photo) || lb.thumb }); pulled++; }
+        }
+        continue;
+      }
+      const rb = JSON.parse(utf8b64((await ghGetFile(cfg, `bottles/${id}.json`)).content));
+      if (lb?.dirty && (lb.updated || 0) >= (rb.updated || 0)) { lb.remoteSha = sha; await putBottle(lb); continue; } // ours is newer, pushed below
+      let photo = lb?.photo || rb.photoUrl;
+      if ((!photo || !photo.startsWith("data:")) && photos.has(id)) { const f = await ghGetFile(cfg, `photos/${id}.jpg`); if (f.content) photo = "data:image/jpeg;base64," + f.content.replace(/\s/g, ""); }
+      const thumb = photo?.startsWith("data:") && !rb.thumb?.startsWith("data:") ? await makeThumb(photo) || rb.thumb : rb.thumb;
+      await putBottle({ ...rb, photo, thumb, remoteSha: sha, photoSynced: photos.has(id), dirty: false });
+      pulled++;
+    }
+    for (const b of local) if (b.remoteSha && !remote[b.id] && !b.dirty) { await delBottle(b.id); pulled++; }
+    // 4. Push local changes
+    for (const b of (await allBottles() || []).filter(b => b.dirty)) {
+      const isData = b.photo?.startsWith("data:");
+      if (isData && !b.photoSynced && !photos.has(b.id)) await ghPut(cfg, `photos/${b.id}.jpg`, b.photo.split(",")[1], `Photo ${b.name || b.id}`);
+      const { photo, dirty, remoteSha, photoSynced, ...data } = b;
+      if (b.photo && !isData) data.photoUrl = b.photo;
+      const sha = await ghPut(cfg, `bottles/${b.id}.json`, b64utf8(JSON.stringify(data, null, 2)), `${remoteSha || remote[b.id] ? "Update" : "Add"} ${[b.producer, b.name, b.vintage].filter(Boolean).join(" ") || b.id}`, remoteSha || remote[b.id]);
+      const cur = await getBottle(b.id);
+      if (cur) await putBottle({ ...cur, remoteSha: sha, photoSynced: !!b.photo || photos.has(b.id), dirty: cur.updated !== b.updated });
+      pushed++;
+    }
+    await setMeta("lastSync", Date.now());
+    if (pulled && current === "cellar") viewCellar();
+    if (manual) toast(pulled || pushed ? `Synced: ${pushed} sent, ${pulled} received` : "Everything is up to date");
+    if (current === "more") viewMore();
+  })();
+  try { return await syncing; }
+  catch (e) { if (manual) toast(e.status === 401 ? "GitHub refused the token. Check it under More." : "Sync failed: " + e.message); throw e; }
+  finally { syncing = null; }
+}
+window.addEventListener("online", () => syncSoon());
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncSoon(); });
+
+/* ---------- ui helpers ---------- */
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
+function openSheet(html) { $("#sheetInner").innerHTML = html; $("#sheetBack").style.display = "block"; requestAnimationFrame(() => $("#sheet").classList.add("open")); $("#sheet").scrollTop = 0; }
+function closeSheet() { $("#sheet").classList.remove("open"); $("#sheetBack").style.display = "none"; }
+$("#sheetBack").onclick = closeSheet;
+const scriptLoads = {};
+function loadScript(src) {
+  // One load per script; a failed load (e.g. offline) is forgotten so the next call tries again.
+  return scriptLoads[src] ??= new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src; s.onload = res;
+    s.onerror = () => { s.remove(); delete scriptLoads[src]; rej(new Error("Could not load " + src)); };
+    document.head.appendChild(s);
+  });
+}
+const starsText = n => n ? "★".repeat(n) + "☆".repeat(5 - n) : "";
+
+/* ---------- dictionary lookup ---------- */
+const findRegion = name => { const n = norm(name); return n ? REGIONS.find(r => [r.name, ...r.aliases].some(a => norm(a) === n)) : null; };
+const findGrape = name => { const n = norm(name); return n ? GRAPES.find(g => [g.name, ...g.aliases].some(a => norm(a) === n)) : null; };
+
+/* ---------- text matching ---------- */
+const STOP = new Set("DOC DOCG DOP IGT IGP AOC AOP DO DOCA DOQ VDP AVA DENOMINAZIONE DENOMINACION ORIGINE ORIGEN CONTROLLATA GARANTITA CONTROLEE CONTROLADA APPELLATION PROTEGEE TIPICA GEOGRAFICA INDICAZIONE PRODUCT PRODUCE PRODUCED BOTTLED IMBOTTIGLIATO MIS EN BOUTEILLE AU CHATEAU THE AND DI DE DEL DELLA DELLE DU DES LA LE LES ET VINO VIN VINHO WINE WEIN RED WHITE ROSSO BIANCO ROSE ROSATO TINTO BLANCO ITALIA ITALY FRANCE ESPANA SPAIN PRODOTTO CONTAINS SULFITES SOLFITI VOL ALC ML CL".split(" "));
+function deletes(t) { const out = []; for (let i = 0; i < t.length; i++) out.push(t.slice(0, i) + t.slice(i + 1)); return out; }
+function buildOcrIndex(text) {
+  const n = norm(text);
+  const tokens = n.split(" ").filter(t => t.length >= 3);
+  const set = new Set(tokens);
+  for (const t of tokens) if (t.length >= 4) for (const d of deletes(t)) set.add(d);
+  return { n: " " + n + " ", tokens, set };
+}
+function tokenHit(idx, t) {
+  if (idx.set.has(t)) return true;
+  if (t.length >= 5) for (const d of deletes(t)) if (idx.set.has(d)) return true;
+  // OCR often catches only part of a word ("RDOLIN" for BARDOLINO): accept a fragment of at least half the word.
+  if (t.length >= 6) for (const o of idx.tokens) if (o.length >= 5 && o.length * 2 >= t.length && t.includes(o)) return true;
+  return false;
+}
+function phraseHit(idx, phrase) {
+  const p = norm(phrase); if (!p) return false;
+  if (idx.n.includes(" " + p + " ")) return true;
+  const parts = p.split(" ");
+  return parts.length === 1 && p.length >= 5 && tokenHit(idx, p);
+}
+function detectRegions(idx) {
+  const hits = [];
+  for (const r of REGIONS) {
+    const names = [r.name, ...r.aliases].sort((a, b) => b.length - a.length);
+    const hit = names.find(a => phraseHit(idx, a));
+    if (hit) hits.push({ r, hit, len: norm(hit).length });
+  }
+  hits.sort((a, b) => b.len - a.len);
+  return hits.map(h => h.r);
+}
+function detectGrapes(idx) {
+  return GRAPES.filter(g => [g.name, ...g.aliases].some(a => phraseHit(idx, a)));
+}
+function detectVintage(text) {
+  const now = new Date().getFullYear();
+  const m = (text.match(/\b(19[4-9]\d|20\d\d)\b/g) || []).map(Number).filter(y => y <= now);
+  return m.length ? String(m[0]) : "";
+}
+function guessNames(text, regions, grapes) {
+  const skip = new Set();
+  [...regions.flatMap(r => [r.name, ...r.aliases]), ...grapes.flatMap(g => [g.name, ...g.aliases])].forEach(a => norm(a).split(" ").forEach(t => skip.add(t)));
+  const lines = text.split(/\n+/).map(l => norm(l).split(" ").filter(t => t.length >= 3 && /[A-Z]{3}/.test(t) && !STOP.has(t) && !skip.has(t) && !/^\d+$/.test(t)).join(" ")).filter(Boolean);
+  return { producer: title(lines[0] || ""), name: title(lines[1] || "") };
+}
+
+/* ---------- wine database (X-Wines import) ---------- */
+let WINES = null;
+async function loadWines() {
+  if (WINES) return WINES;
+  const list = await tx("wines", "readonly", s => s.getAll()) || [];
+  for (const w of list) {
+    w._w = norm(w.winery).split(" ").filter(t => t.length >= 3 && !STOP.has(t));
+    w._n = norm(w.name).split(" ").filter(t => t.length >= 3 && !STOP.has(t));
+  }
+  return (WINES = list);
+}
+function matchWines(idx, list) {
+  const out = [];
+  for (const w of list) {
+    if (!w._n.length && !w._w.length) continue;
+    let mw = 0, mn = 0;
+    for (const t of w._w) if (tokenHit(idx, t)) mw++;
+    for (const t of w._n) if (tokenHit(idx, t)) mn++;
+    if (!mn && !mw) continue;
+    const score = (mw * 2 + mn) / (w._w.length * 2 + w._n.length);
+    if (score >= 0.5 && (mn || !w._n.length)) out.push({ w, score });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out.slice(0, 6).map(o => o.w);
+}
+function parseList(s) {
+  if (!s) return [];
+  try { return JSON.parse(s.replace(/'/g, '"')); } catch { return s.replace(/[\[\]']/g, "").split(",").map(x => x.trim()).filter(Boolean); }
+}
+async function importWinesCsv(file, onProgress) {
+  await loadScript(CDN.papa);
+  await tx("wines", "readwrite", s => s.clear());
+  let count = 0, batch = [];
+  const flush = async () => { const b = batch; batch = []; await tx("wines", "readwrite", s => { b.forEach(w => s.put(w)); }); };
+  await new Promise((res, rej) => {
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true, chunkSize: 1024 * 512,
+      chunk: async (results, parser) => {
+        parser.pause();
+        try {
+          for (const r of results.data) {
+            if (!r.WineID) continue;
+            batch.push({ id: String(r.WineID), name: r.WineName || "", type: r.Type || "", grapes: parseList(r.Grapes), pairs: parseList(r.Harmonize),
+              abv: r.ABV || "", body: r.Body || "", acidity: r.Acidity || "", country: r.Country || "", region: r.RegionName || "", winery: r.WineryName || "", elaborate: r.Elaborate || "" });
+            count++;
+          }
+          await flush();
+          onProgress(count, results.meta.cursor / file.size);
+          parser.resume();
+        } catch (e) { parser.abort(); rej(e); }
+      },
+      complete: () => res(), error: rej
+    });
+  });
+  await setMeta("wineCount", count);
+  WINES = null;
+  return count;
+}
+
+/* ---------- OCR ---------- */
+let ocrWorker = null;
+async function getWorker(onProgress) {
+  if (ocrWorker) return ocrWorker;
+  await loadScript(CDN.tesseract);
+  ocrWorker = await Tesseract.createWorker("eng", 1, {
+    workerPath: CDN.worker, corePath: CDN.core, langPath: CDN.lang,
+    logger: m => { if (m.progress != null) onProgress(m.status, m.progress); }
+  });
+  return ocrWorker;
+}
+function fileToImage(file) {
+  return new Promise((res, rej) => { const url = URL.createObjectURL(file); const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = url; });
+}
+function drawScaled(img, max) {
+  const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); return c;
+}
+// Label prep for OCR: green channel (makes black and red ink dark, light paper and patterns pale),
+// a small box blur against print texture, then a hard black/white threshold.
+function prepForOcr(img, max, radius, threshold) {
+  const c = drawScaled(img, max), ctx = c.getContext("2d"), W = c.width, H = c.height;
+  const id = ctx.getImageData(0, 0, W, H), d = id.data, g = new Float32Array(W * H), t = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) g[i] = d[i * 4 + 1];
+  const n = radius * 2 + 1;
+  for (let y = 0; y < H; y++) { let s = 0; for (let x = -radius; x <= radius; x++) s += g[y * W + Math.min(W - 1, Math.max(0, x))];
+    for (let x = 0; x < W; x++) { t[y * W + x] = s / n; s += g[y * W + Math.min(W - 1, x + radius + 1)] - g[y * W + Math.max(0, x - radius)]; } }
+  for (let x = 0; x < W; x++) { let s = 0; for (let y = -radius; y <= radius; y++) s += t[Math.min(H - 1, Math.max(0, y)) * W + x];
+    for (let y = 0; y < H; y++) { const v = s / n < threshold ? 0 : 255, i = (y * W + x) * 4; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      s += t[Math.min(H - 1, y + radius + 1) * W + x] - t[Math.max(0, y - radius) * W + x]; } }
+  ctx.putImageData(id, 0, 0); return c;
+}
+// Two passes with different settings; keep only words Tesseract is fairly sure about.
+async function readLabel(worker, img) {
+  await worker.setParameters({ tessedit_pageseg_mode: "11" });
+  const seen = new Set(), lines = [];
+  for (const [max, r, th] of [[2000, 1, 80], [2400, 2, 100]]) {
+    const { data } = await worker.recognize(prepForOcr(img, max, r, th), {}, { blocks: true });
+    for (const b of data.blocks || []) for (const p of b.paragraphs) for (const l of p.lines) {
+      const words = l.words.filter(w => w.confidence >= 60 && /[A-Za-z0-9]{3}/.test(w.text)).map(w => w.text.replace(/[^\p{L}\p{N}'’-]/gu, ""))
+        .filter(w => w.length >= 3 && !seen.has(w.toUpperCase()));
+      words.forEach(w => seen.add(w.toUpperCase()));
+      if (words.length) lines.push(words.join(" "));
+    }
+  }
+  return lines.join("\n");
+}
+
+function makeThumb(dataUrl) {
+  return new Promise(res => { const img = new Image(); img.onload = () => res(drawScaled(img, 220).toDataURL("image/jpeg", 0.7)); img.onerror = () => res(null); img.src = dataUrl; });
+}
+
+/* ---------- router ---------- */
+let current = "cellar";
+function go(tab, arg) {
+  current = tab;
+  const hl = tab === "bottle" || tab === "edit" ? "cellar" : tab;
+  document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.tab === hl ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  closeSheet(); window.scrollTo(0, 0);
+  if (bigMap) { bigMap.remove(); bigMap = null; }
+  ({ cellar: viewCellar, map: viewMap, scan: viewScan, dict: viewDict, more: viewMore, bottle: viewBottle, edit: viewEdit })[tab](arg);
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => go(b.dataset.tab));
+
+/* ---------- cellar ---------- */
+async function viewCellar() {
+  const list = (await allBottles() || []).sort((a, b) => b.created - a.created);
+  const q = viewCellar.q || "";
+  const shown = q ? list.filter(b => norm([b.producer, b.name, b.region, b.country, (b.grapes || []).join(" "), b.vintage].join(" ")).includes(norm(q))) : list;
+  $("#view").innerHTML = `
+    <h1>Cellar</h1>
+    <p class="muted">${list.length ? `${list.length} bottle${list.length === 1 ? "" : "s"} tasted` : "Bottles you scan end up here."}</p>
+    ${list.length ? `<input type="search" id="cq" placeholder="Search producer, region, grape…" value="${esc(q)}">` : ""}
+    <div id="list">${shown.map(b => `
+      <button class="bottle" data-id="${b.id}">
+        ${b.thumb ? `<img src="${b.thumb}" alt="" loading="lazy">` : `<div class="ph"></div>`}
+        <div><div class="name">${esc(b.name || b.producer || "Unnamed bottle")}</div>
+        <div class="meta">${esc([b.name ? b.producer : "", b.vintage].filter(Boolean).join(", "))}</div>
+        <div class="meta">${esc([b.region, b.country].filter(Boolean).join(", "))}</div>
+        ${b.rating ? `<div class="stars-static" aria-label="${b.rating} of 5">${starsText(b.rating)}</div>` : ""}</div>
+      </button>`).join("")}</div>
+    ${!list.length ? `<div class="empty"><div class="big">Take a photo of a label to start</div><p class="muted">Vino reads the label, looks up the region and grapes, and saves the bottle with your notes.</p><button class="btn" id="startScan">Scan a bottle</button></div>` : ""}
+    ${list.length && !shown.length ? `<p class="muted">No bottles match “${esc(q)}”.</p>` : ""}`;
+  $("#startScan")?.addEventListener("click", () => go("scan"));
+  const cq = $("#cq"); if (cq) cq.oninput = () => { viewCellar.q = cq.value; const pos = cq.selectionStart; viewCellar().then(() => { const n = $("#cq"); n.focus(); n.setSelectionRange(pos, pos); }); };
+  document.querySelectorAll(".bottle").forEach(el => el.onclick = () => go("bottle", el.dataset.id));
+}
+
+/* ---------- scan ---------- */
+let draft = null;
+function viewScan() {
+  draft = null;
+  $("#view").innerHTML = `
+    <h1>Scan a bottle</h1>
+    <p class="muted">Photograph the front label, straight on and in good light. You can also type the name if the label is hard to read.</p>
+    <div class="row" style="margin:16px 0">
+      <button class="btn" id="takePhoto">Take photo</button>
+      <button class="btn quiet" id="typeIt">Type it instead</button>
+    </div>
+    <div id="scanOut"></div>`;
+  $("#takePhoto").onclick = () => $("#photoInput").click();
+  $("#typeIt").onclick = () => { draft = { id: crypto.randomUUID(), created: Date.now(), ocr: "" }; renderDraft(""); };
+}
+$("#photoInput").onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  if (current !== "scan") go("scan");
+  const out = $("#scanOut");
+  const img = await fileToImage(file);
+  const photo = drawScaled(img, 1100).toDataURL("image/jpeg", 0.75);
+  const thumb = drawScaled(img, 220).toDataURL("image/jpeg", 0.7);
+  draft = { id: crypto.randomUUID(), created: Date.now(), photo, thumb, ocr: "" };
+  out.innerHTML = `<div class="photo"><img src="${photo}" alt="Your photo"></div>
+    <p id="ocrStatus" class="small muted">Reading the label…</p><div class="progress"><i id="ocrBar"></i></div>`;
+  try {
+    const w = await getWorker((status, p) => {
+      const s = $("#ocrStatus"), bar = $("#ocrBar"); if (!s) return;
+      s.textContent = status.includes("recogniz") ? "Reading the label…" : "Getting the label reader ready (first time only)…";
+      bar.style.width = Math.round(p * 100) + "%";
+    });
+    $("#ocrStatus").textContent = "Reading the label…";
+    draft.ocr = await readLabel(w, img);
+  } catch (err) {
+    draft.ocr = "";
+    toast("Couldn't read the label. Type the name below.");
+  }
+  renderDraft(draft.ocr);
+};
+
+async function renderDraft(text) {
+  const out = $("#scanOut");
+  const idx = buildOcrIndex(text);
+  const regions = text ? detectRegions(idx) : [];
+  const grapes = text ? detectGrapes(idx) : [];
+  const wineCount = await getMeta("wineCount") || 0;
+  let wines = [];
+  if (text && wineCount) { out.insertAdjacentHTML("beforeend", `<p class="small muted" id="dbmsg">Searching your wine list…</p>`); wines = matchWines(idx, await loadWines()); }
+  const guess = guessNames(text, regions, grapes);
+  const r0 = regions[0];
+  Object.assign(draft, {
+    producer: draft.producer || guess.producer, name: draft.name || guess.name, vintage: draft.vintage || detectVintage(text),
+    region: draft.region || r0?.name || "", country: draft.country || r0?.country || "",
+    grapes: draft.grapes?.length ? draft.grapes : (grapes.length ? grapes.map(g => g.name) : r0?.grapes || []),
+    color: draft.color || colorFrom(r0, grapes)
+  });
+  out.innerHTML = `
+    ${draft.photo ? `<div class="photo"><img src="${draft.photo}" alt="Your photo"></div>` : ""}
+    ${text ? `<details><summary class="small muted">Text found on the label</summary>
+      <textarea id="ocrText">${esc(text)}</textarea>
+      <button class="btn quiet" id="reread" style="margin-top:8px">Search again with this text</button></details>` : `
+      <label class="f" for="ocrText">Name on the label</label><input type="text" id="ocrText" placeholder="e.g. Masi Frescaripa Bardolino 2025">
+      <button class="btn quiet" id="reread" style="margin-top:8px">Look it up</button>`}
+    ${wines.length ? `<h3>Is it one of these?</h3>${wines.map(w => `
+      <button class="match" data-wid="${esc(w.id)}"><div class="t">${esc(w.name)}</div>
+      <div class="small muted">${esc(w.winery)}, ${esc(w.region)}, ${esc(w.country)}</div>
+      <div class="small">${esc(w.type)}${w.grapes?.length ? ": " + esc(w.grapes.join(", ")) : ""}</div></button>`).join("")}` : ""}
+    ${text && !wines.length && wineCount ? `<p class="small muted">No exact wine found in your wine list. The details below come from the region and grape dictionary.</p>` : ""}
+    ${regions.length > 1 ? `<h3>Region</h3><div class="chips">${regions.map(r => `<button class="chip" data-region="${esc(r.name)}">${esc(r.name)}</button>`).join("")}</div>` : ""}
+    <h2>Details</h2>
+    <div id="form"></div>`;
+  renderForm($("#form"), draft, async b => { await saveBottle(b); toast("Bottle saved"); go("bottle", b.id); });
+  $("#reread").onclick = () => { const t = $("#ocrText").value.trim(); draft.ocr = t; ["producer", "name", "vintage", "region", "country", "color", "wine"].forEach(k => delete draft[k]); draft.grapes = []; renderDraft(t); };
+  out.querySelectorAll("[data-wid]").forEach(el => el.onclick = () => {
+    const w = wines.find(x => x.id === el.dataset.wid);
+    out.querySelectorAll(".match").forEach(m => m.classList.toggle("sel", m === el));
+    const r = findRegion(w.region) || regions[0];
+    Object.assign(draft, { producer: w.winery, name: w.name, region: r?.name || w.region, country: w.country, grapes: w.grapes, color: typeToColor(w.type),
+      wine: { id: w.id, type: w.type, abv: w.abv, body: w.body, acidity: w.acidity, pairs: w.pairs, region: w.region, elaborate: w.elaborate } });
+    renderForm($("#form"), draft, async b => { await saveBottle(b); toast("Bottle saved"); go("bottle", b.id); });
+  });
+  // Strong first match: select it straight away; the user can still tap another one.
+  if (wines.length && !draft.wine) out.querySelector("[data-wid]").click();
+  out.querySelectorAll("[data-region]").forEach(el => el.onclick = () => {
+    const r = findRegion(el.dataset.region);
+    Object.assign(draft, { region: r.name, country: r.country, grapes: r.grapes, color: colorFrom(r, []) });
+    renderForm($("#form"), draft, async b => { await saveBottle(b); toast("Bottle saved"); go("bottle", b.id); });
+  });
+}
+function colorFrom(r, grapes) {
+  if (grapes?.length === 1) return grapes[0].color;
+  if (!r) return "";
+  const c = r.color.toLowerCase();
+  return c.startsWith("sparkling") ? "Sparkling" : c.startsWith("fortified") ? "Fortified" : c.startsWith("sweet") ? "Sweet" : c.startsWith("white") ? "White" : c.startsWith("rosé") ? "Rosé" : c.startsWith("red") ? "Red" : "";
+}
+function typeToColor(t) { t = (t || "").toLowerCase(); return t.includes("spark") ? "Sparkling" : t.includes("dessert") || t.includes("port") ? "Sweet" : t.includes("ros") ? "Rosé" : t.includes("white") ? "White" : t.includes("red") ? "Red" : ""; }
+
+function renderForm(el, b, onSave) {
+  const colors = ["", "Red", "White", "Rosé", "Sparkling", "Sweet", "Fortified"];
+  el.innerHTML = `
+    <label class="f" for="fProducer">Producer</label><input type="text" id="fProducer" value="${esc(b.producer)}" autocomplete="off">
+    <label class="f" for="fName">Wine</label><input type="text" id="fName" value="${esc(b.name)}" autocomplete="off">
+    <div class="two">
+      <div><label class="f" for="fVintage">Vintage</label><input type="number" inputmode="numeric" id="fVintage" value="${esc(b.vintage)}"></div>
+      <div><label class="f" for="fColor">Type</label><select id="fColor">${colors.map(c => `<option ${c === b.color ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+    </div>
+    <label class="f" for="fRegion">Region or appellation</label><input type="text" id="fRegion" list="regionList" value="${esc(b.region)}" autocomplete="off">
+    <datalist id="regionList">${REGIONS.map(r => `<option value="${esc(r.name)}">`).join("")}</datalist>
+    <label class="f" for="fCountry">Country</label><input type="text" id="fCountry" value="${esc(b.country)}">
+    <label class="f" for="fGrapes">Grapes</label><input type="text" id="fGrapes" value="${esc((b.grapes || []).join(", "))}" placeholder="Comma separated">
+    <label class="f">Your rating</label>
+    <div class="stars" id="fStars">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" aria-label="${n} star${n > 1 ? "s" : ""}" class="${n <= (b.rating || 0) ? "on" : ""}">★</button>`).join("")}</div>
+    <div class="two">
+      <div><label class="f" for="fPrice">Price</label><input type="text" id="fPrice" inputmode="decimal" value="${esc(b.price)}" placeholder="€"></div>
+      <div><label class="f" for="fWhere">Bought / drunk at</label><input type="text" id="fWhere" value="${esc(b.where)}"></div>
+    </div>
+    <label class="f" for="fNotes">Notes</label><textarea id="fNotes" placeholder="What did you think? What did you eat with it?">${esc(b.notes)}</textarea>
+    <div class="row" style="margin-top:18px"><button class="btn" id="fSave">Save bottle</button></div>`;
+  let rating = b.rating || 0;
+  el.querySelectorAll("#fStars button").forEach(s => s.onclick = () => { rating = +s.dataset.n === rating ? 0 : +s.dataset.n; el.querySelectorAll("#fStars button").forEach(x => x.classList.toggle("on", +x.dataset.n <= rating)); });
+  $("#fRegion", el).onchange = () => { const r = findRegion($("#fRegion", el).value); if (r) { $("#fCountry", el).value ||= r.country; if (!$("#fGrapes", el).value) $("#fGrapes", el).value = r.grapes.join(", "); } };
+  $("#fSave", el).onclick = () => {
+    const v = id => $(id, el).value.trim();
+    const r = findRegion(v("#fRegion"));
+    onSave({ ...b, producer: v("#fProducer"), name: v("#fName"), vintage: v("#fVintage"), color: v("#fColor"), region: r ? r.name : v("#fRegion"),
+      country: v("#fCountry") || r?.country || "", grapes: v("#fGrapes").split(",").map(s => s.trim()).filter(Boolean), rating,
+      price: v("#fPrice"), where: v("#fWhere"), notes: v("#fNotes"), updated: Date.now() });
+  };
+}
+
+/* ---------- bottle detail ---------- */
+async function viewBottle(id) {
+  const b = await getBottle(id); if (!b) return go("cellar");
+  const r = findRegion(b.region);
+  const w = b.wine;
+  $("#view").innerHTML = `
+    ${b.photo ? `<div class="hero-photo"><img src="${b.photo}" alt="Label photo"></div>` : ""}
+    <div class="producer">${esc(b.producer)}</div>
+    <h1>${esc(b.name || b.producer || "Unnamed bottle")}</h1>
+    <div class="row" style="justify-content:space-between">${b.vintage ? `<span class="vintage">${esc(b.vintage)}</span>` : "<span></span>"}
+      ${b.rating ? `<span class="stars-static" style="font-size:1.1rem" aria-label="${b.rating} of 5">${starsText(b.rating)}</span>` : ""}</div>
+    ${b.notes ? `<div class="note">${esc(b.notes).replace(/\n/g, "<br>")}</div>` : ""}
+    <dl class="facts">
+      ${b.color ? `<dt>Type</dt><dd>${esc(b.color)}</dd>` : ""}
+      ${b.region ? `<dt>Region</dt><dd>${r ? `<button class="link" data-open-region="${esc(r.name)}">${esc(r.name)}</button>${r.area ? `<span class="muted">, ${esc(r.area)}</span>` : ""}` : esc(b.region)}</dd>` : ""}
+      ${b.country ? `<dt>Country</dt><dd>${esc(b.country)}</dd>` : ""}
+      ${b.grapes?.length ? `<dt>Grapes</dt><dd>${b.grapes.map(g => findGrape(g) ? `<button class="link" data-open-grape="${esc(findGrape(g).name)}">${esc(g)}</button>` : esc(g)).join(", ")}</dd>` : ""}
+      ${r?.style || b.vivino?.style ? `<dt>Style</dt><dd>${esc(r?.style || b.vivino.style)}</dd>` : ""}
+      ${r?.serve ? `<dt>Serve at</dt><dd>${esc(r.serve)}</dd>` : ""}
+      ${r?.pairs || w?.pairs?.length ? `<dt>Goes with</dt><dd>${esc(w?.pairs?.length ? w.pairs.join(", ") : r.pairs)}</dd>` : ""}
+      ${w?.body ? `<dt>Body</dt><dd>${esc(w.body)}${w.acidity ? `, ${esc(w.acidity.toLowerCase())} acidity` : ""}</dd>` : ""}
+      ${w?.abv ? `<dt>Alcohol</dt><dd>${esc(w.abv)}%</dd>` : ""}
+      ${b.price ? `<dt>Price</dt><dd>${esc(b.price)}</dd>` : ""}
+      ${b.where ? `<dt>Where</dt><dd>${esc(b.where)}</dd>` : ""}
+      ${b.vivino?.avg ? `<dt>Vivino</dt><dd>${b.vivino.avg.toFixed(1)} average${b.vivino.url ? `, <a class="link" href="${esc(b.vivino.url)}" target="_blank" rel="noopener">open on Vivino</a>` : ""}</dd>` : ""}
+      ${b.vivino?.drink ? `<dt>Drink</dt><dd>${esc(b.vivino.drink)}</dd>` : ""}
+      <dt>Added</dt><dd>${new Date(b.created).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}</dd>
+    </dl>
+    ${miniMapHtml(r)}
+    <div class="row" style="margin-top:20px">
+      <a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener"
+        href="${esc(b.vivino?.url || "https://www.vivino.com/search/wines?q=" + encodeURIComponent([b.producer, b.name, b.vintage].filter(Boolean).join(" ")))}">Look up on Vivino</a>
+      ${r?.chart ? `<a class="btn ghost" style="text-decoration:none" target="_blank" rel="noopener" href="${esc(r.chart.url)}" title="${esc(r.chart.label)} vintage chart">Vintage chart · ${esc(r.chart.source)}</a>` : ""}
+      <button class="btn quiet" id="edit">Edit</button>
+      <button class="btn danger" id="del">Delete</button>
+    </div>`;
+  bindDictLinks($("#view"));
+  miniMaps($("#view"));
+  $("#edit").onclick = () => go("edit", id);
+  $("#del").onclick = async () => { if (confirm("Delete this bottle?")) { await removeBottle(id); toast("Bottle deleted"); go("cellar"); } };
+}
+async function viewEdit(id) {
+  const b = await getBottle(id);
+  $("#view").innerHTML = `<h1>Edit bottle</h1><div id="form"></div><button class="btn quiet" id="cancel" style="margin-top:10px">Cancel</button>`;
+  renderForm($("#form"), b, async nb => { await saveBottle(nb); toast("Changes saved"); go("bottle", id); });
+  $("#cancel").onclick = () => go("bottle", id);
+}
+
+/* ---------- maps (MapLibre + OpenFreeMap) ---------- */
+let mapLib = null, bigMap = null;
+function loadCss(href) { if (!document.querySelector(`link[href="${href}"]`)) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; document.head.appendChild(l); } }
+async function maplibre() {
+  if (mapLib) return mapLib;
+  loadCss(CDN.maplibreCss);
+  await loadScript(CDN.maplibre);
+  if (!window.maplibregl) throw new Error("Map library missing");
+  return (mapLib = window.maplibregl);
+}
+const pinEl = (cls, text) => { const e = document.createElement("div"); e.className = "pin " + cls; if (text) e.textContent = text; return e; };
+// Small map under a region or bottle; tap "Open map" to see it full screen.
+async function miniMaps(root) {
+  const els = root.querySelectorAll(".minimap:not([data-ready])");
+  if (!els.length) return;
+  let ml;
+  try { ml = await maplibre(); } catch { els.forEach(el => el.innerHTML = `<div class="map-msg small">Map needs an internet connection.</div>`); return; }
+  els.forEach(el => {
+    el.dataset.ready = "1";
+    const ll = [+el.dataset.lng, +el.dataset.lat];
+    const m = new ml.Map({ container: el, style: CDN.mapStyle, center: ll, zoom: 6.2, interactive: false, attributionControl: { compact: true } });
+    new ml.Marker({ element: pinEl("") }).setLngLat(ll).addTo(m);
+    const b = document.createElement("button"); b.className = "open"; b.textContent = "Open map";
+    b.onclick = () => go("map", { lng: ll[0], lat: ll[1] }); el.appendChild(b);
+  });
+}
+const miniMapHtml = r => r?.lat != null ? `<div class="minimap" data-lat="${r.lat}" data-lng="${r.lng}" role="img" aria-label="Map of ${esc(r.name)}"></div>` : "";
+async function viewMap(focus) {
+  const mode = viewMap.mode || "mine";
+  $("#view").innerHTML = `<div class="map-full" id="mapwrap"><div id="bigmap" class="map-canvas"></div>
+    <div class="map-bar"><div class="seg" role="group" aria-label="Show"><button data-mode="mine" aria-pressed="${mode === "mine"}">My bottles</button><button data-mode="all" aria-pressed="${mode === "all"}">All regions</button></div></div></div>`;
+  document.querySelectorAll(".map-bar .seg button").forEach(b => b.onclick = () => { viewMap.mode = b.dataset.mode; go("map"); });
+  let ml;
+  try { ml = await maplibre(); } catch { $("#mapwrap").insertAdjacentHTML("beforeend", `<div class="map-msg">The map needs an internet connection. Your bottles are still in the Cellar.</div>`); return; }
+  if (current !== "map") return;
+  bigMap = new ml.Map({ container: "bigmap", style: CDN.mapStyle, center: [8, 44], zoom: 3.4, attributionControl: { compact: true } });
+  bigMap.addControl(new ml.NavigationControl({ showCompass: false }), "bottom-right");
+  const pts = [];
+  if (mode === "mine") {
+    const groups = {};
+    for (const b of await allBottles() || []) { const r = findRegion(b.region); if (r?.lat != null) (groups[r.name] ??= { r, bottles: [] }).bottles.push(b); }
+    for (const { r, bottles } of Object.values(groups)) {
+      const pop = new ml.Popup({ offset: 14, closeButton: false }).setHTML(`<div class="t">${esc(r.name)}</div><div style="color:#62605E;font-size:.85rem;margin-bottom:4px">${esc(r.country)}</div>` +
+        bottles.sort((a, b) => b.created - a.created).map(b => `<button data-bottle="${esc(b.id)}">${esc([b.producer, b.name].filter(Boolean).join(" "))}${b.vintage ? " " + esc(b.vintage) : ""}${b.rating ? ` <span style="color:#6E1F33">${"★".repeat(b.rating)}</span>` : ""}</button>`).join(""));
+      pop.on("open", () => pop.getElement().querySelectorAll("[data-bottle]").forEach(x => x.onclick = () => go("bottle", x.dataset.bottle)));
+      new ml.Marker({ element: pinEl("count", String(bottles.length)) }).setLngLat([r.lng, r.lat]).setPopup(pop).addTo(bigMap);
+      pts.push([r.lng, r.lat]);
+    }
+    if (!pts.length) $("#mapwrap").insertAdjacentHTML("beforeend", `<div class="map-msg" style="pointer-events:none">Bottles with a known region appear here as pins.</div>`);
+  } else {
+    for (const r of REGIONS.filter(r => r.lat != null)) {
+      const el = pinEl("region"); el.title = r.name;
+      el.onclick = e => { e.stopPropagation(); openSheet(regionHtml(r)); bindDictLinks($("#sheetInner")); miniMaps($("#sheetInner")); };
+      new ml.Marker({ element: el }).setLngLat([r.lng, r.lat]).addTo(bigMap);
+    }
+  }
+  if (focus?.lng != null) bigMap.jumpTo({ center: [focus.lng, focus.lat], zoom: 7 });
+  else if (pts.length === 1) bigMap.jumpTo({ center: pts[0], zoom: 6 });
+  else if (pts.length > 1) {
+    // Zoom to where most of your bottles are (e.g. Europe); far-away pins are a pan away.
+    const near = (a, b) => Math.abs(a[0] - b[0]) < 45 && Math.abs(a[1] - b[1]) < 25;
+    const hub = pts.reduce((best, p) => { const n = pts.filter(q => near(p, q)).length; return n > best.n ? { p, n } : best; }, { n: 0 }).p;
+    const sel = pts.filter(q => near(hub, q));
+    const b = new ml.LngLatBounds(sel[0], sel[0]); sel.forEach(p => b.extend(p));
+    bigMap.fitBounds(b, { padding: { top: 80, bottom: 50, left: 50, right: 50 }, maxZoom: 7, duration: 0 });
+  }
+}
+
+/* ---------- dictionary ---------- */
+function regionHtml(r) {
+  return `<p class="producer">${esc(r.country)}${r.area ? `, ${esc(r.area)}` : ""}</p><h1>${esc(r.name)}</h1>
+    ${r.aliases.length ? `<p class="small muted">Also on labels: ${esc(r.aliases.join(", "))}</p>` : ""}
+    <dl class="facts"><dt>Type</dt><dd>${esc(r.color)}</dd>
+    <dt>Grapes</dt><dd>${r.grapes.map(g => findGrape(g) ? `<button class="link" data-open-grape="${esc(findGrape(g).name)}">${esc(g)}</button>` : esc(g)).join(", ")}</dd>
+    <dt>Style</dt><dd>${esc(r.style)}</dd><dt>Serve at</dt><dd>${esc(r.serve)}</dd><dt>Goes with</dt><dd>${esc(r.pairs)}</dd>
+    ${r.chart ? `<dt>Vintages</dt><dd><a class="link" href="${esc(r.chart.url)}" target="_blank" rel="noopener">${esc(r.chart.label)} chart</a> <span class="muted">(${esc(r.chart.source)})</span></dd>` : ""}</dl>
+    ${miniMapHtml(r)}`;
+}
+function grapeHtml(g) {
+  const where = REGIONS.filter(r => r.grapes.some(x => findGrape(x) === g));
+  return `<p class="producer">${esc(g.color)} grape</p><h1>${esc(g.name)}</h1>
+    ${g.aliases.length ? `<p class="small muted">Also called: ${esc(g.aliases.join(", "))}</p>` : ""}
+    <p>${esc(g.about)}</p>
+    ${where.length ? `<h3>Where you'll find it</h3><div class="chips">${where.map(r => `<button class="chip" data-open-region="${esc(r.name)}">${esc(r.name)}</button>`).join("")}</div>` : ""}`;
+}
+function bindDictLinks(root) {
+  root.querySelectorAll("[data-open-region]").forEach(el => el.onclick = () => { openSheet(regionHtml(findRegion(el.dataset.openRegion))); bindDictLinks($("#sheetInner")); miniMaps($("#sheetInner")); });
+  root.querySelectorAll("[data-open-grape]").forEach(el => el.onclick = () => { openSheet(grapeHtml(findGrape(el.dataset.openGrape))); bindDictLinks($("#sheetInner")); });
+}
+function viewDict() {
+  const mode = viewDict.mode || "regions", q = viewDict.q || "";
+  const nq = norm(q);
+  let body = "";
+  if (mode === "regions") {
+    const list = REGIONS.filter(r => !nq || norm([r.name, ...r.aliases, r.country, r.area, ...r.grapes].join(" ")).includes(nq));
+    const byC = {}; list.forEach(r => (byC[r.country] ??= []).push(r));
+    body = Object.entries(byC).map(([c, rs]) => `<p class="country">${esc(c)}</p>` + rs.map(r => `
+      <button class="dict-item" data-open-region="${esc(r.name)}"><div class="t">${esc(r.name)}</div><div class="small muted">${esc(r.color)}: ${esc(r.grapes.join(", "))}</div></button>`).join("")).join("");
+  } else {
+    const list = GRAPES.filter(g => !nq || norm([g.name, ...g.aliases, g.color, g.about].join(" ")).includes(nq)).sort((a, b) => a.name.localeCompare(b.name));
+    body = list.map(g => `<button class="dict-item" data-open-grape="${esc(g.name)}"><div class="t">${esc(g.name)}</div><div class="small muted">${esc(g.color)}${g.aliases.length ? `, also ${esc(g.aliases.join(", "))}` : ""}</div></button>`).join("");
+  }
+  $("#view").innerHTML = `
+    <h1>Dictionary</h1>
+    <div class="seg" role="group" aria-label="Show"><button data-mode="regions" aria-pressed="${mode === "regions"}">Regions</button><button data-mode="grapes" aria-pressed="${mode === "grapes"}">Grapes</button></div>
+    <input type="search" id="dq" placeholder="${mode === "regions" ? "Bardolino, Rioja, Italy, Merlot…" : "Corvina, Shiraz, white…"}" value="${esc(q)}">
+    <div>${body || `<p class="muted" style="margin-top:16px">Nothing found for “${esc(q)}”.</p>`}</div>`;
+  document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { viewDict.mode = b.dataset.mode; viewDict.q = ""; viewDict(); });
+  const dq = $("#dq"); dq.oninput = () => { viewDict.q = dq.value; const p = dq.selectionStart; viewDict(); const n = $("#dq"); n.focus(); n.setSelectionRange(p, p); };
+  bindDictLinks($("#view"));
+}
+
+/* ---------- more ---------- */
+async function viewMore() {
+  const wc = await getMeta("wineCount") || 0;
+  const bottles = await allBottles() || [];
+  const sync = await getMeta("sync"), last = await getMeta("lastSync");
+  const pending = bottles.filter(b => b.dirty).length + Object.keys(await getMeta("tombstones") || {}).length;
+  $("#view").innerHTML = `
+    <h1>More</h1>
+    <h2>Wine list</h2>
+    <p>${wc ? `${wc.toLocaleString()} wines loaded. Scans are matched against this list first.` : "No wine list loaded yet. Scans use the region and grape dictionary only."}</p>
+    <p class="small muted">Load the wines CSV from the X-Wines dataset (Slim or Full version, the file with “wines” in its name). It stays on this phone.</p>
+    <div class="row"><button class="btn ghost" id="loadCsv">${wc ? "Replace wine list" : "Load wine list"}</button></div>
+    <p id="csvStatus" class="small muted"></p>
+    <h2>Sync with GitHub</h2>
+    ${sync?.token ? `
+      <p>Saving to <a class="link" href="https://github.com/${esc(sync.owner)}/${esc(sync.repo)}" target="_blank" rel="noopener">github.com/${esc(sync.owner)}/${esc(sync.repo)}</a>. ${pending ? `${pending} change${pending === 1 ? "" : "s"} waiting.` : "All changes are saved there."}</p>
+      <p class="small muted">${last ? "Last synced " + new Date(last).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) + "." : "Not synced yet."}</p>
+      <div class="row"><button class="btn ghost" id="syncNow">Sync now</button><button class="btn quiet" id="syncOff">Disconnect</button></div>
+      <p class="small muted">To use another repo or a new token: disconnect, then connect again.</p>` : `
+      <p>Keep your bottles in a private GitHub repo, so they're backed up and the same on every device.</p>
+      <details><summary class="small muted">How to set it up</summary>
+        <p class="small">1. On GitHub, create a <strong>private</strong> repo, e.g. <em>vino-data</em>, with a README.<br>
+        2. Settings → Developer settings → Fine-grained tokens → Generate new token.<br>
+        3. Repository access: only that repo. Permissions: Contents → Read and write.<br>
+        4. Paste the repo’s address and the token below. The token stays on this phone.</p></details>
+      <label class="f" for="sUrl">Private repo address</label><input type="url" id="sUrl" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://github.com/you/vino-data">
+      <label class="f" for="sToken">Token</label><input type="text" id="sToken" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="github_pat_…" style="-webkit-text-security:disc">
+      <div class="row" style="margin-top:12px"><button class="btn ghost" id="syncOn">Connect</button></div>
+      <p id="syncMsg" class="small muted"></p>`}
+    <h2>Backup</h2>
+    <p>${sync?.token ? `A single file with all ${bottles.length} bottles, for an extra copy outside GitHub.` : `Your ${bottles.length} bottle${bottles.length === 1 ? "" : "s"} live only on this phone. Save a backup now and then, for example to iCloud Drive.`}</p>
+    <div class="row"><button class="btn ghost" id="exp">Save backup</button><button class="btn quiet" id="imp">Import file</button></div>
+    <p class="small muted">Import takes a Vino backup or a Vivino import file. Wines already in your cellar are skipped.</p>
+    <h2>About</h2>
+    <p class="small muted">Label reading runs on your phone with Tesseract. Bottles are stored on this phone, and in your own private GitHub repo if sync is on. Wine data: X-Wines, de Azambuja, Morais &amp; Filipe (2023), Big Data and Cognitive Computing 7(1), 20.</p>`;
+  $("#loadCsv").onclick = () => $("#csvInput").click();
+  $("#syncNow")?.addEventListener("click", () => syncNow(true).catch(() => {}));
+  $("#syncOff")?.addEventListener("click", async () => {
+    if (!confirm("Stop syncing? Your bottles stay on this phone and in the repo.")) return;
+    await setMeta("sync", null); viewMore();
+  });
+  $("#syncOn")?.addEventListener("click", async () => {
+    const msg = $("#syncMsg");
+    const repo = parseRepo($("#sUrl").value), token = $("#sToken").value.trim();
+    if (!repo) { msg.textContent = "Paste the repo’s address, like https://github.com/you/vino-data."; return; }
+    if (!token) { msg.textContent = "Paste the token."; return; }
+    const cfg = { ...repo, token };
+    msg.textContent = "Checking access…";
+    try {
+      cfg.branch = await testSync(cfg);
+      await setMeta("sync", cfg);
+      // Everything on this phone counts as new for the first upload.
+      const all = await allBottles() || [];
+      await tx("bottles", "readwrite", s => { all.forEach(b => s.put({ ...b, dirty: true, remoteSha: undefined, photoSynced: false })); });
+      msg.textContent = "Connected. Syncing…";
+      await syncNow(true);
+    } catch (e) {
+      msg.textContent = e.status === 401 ? "GitHub refused the token. Copy it again and check it hasn't expired."
+        : e.status === 404 ? `Can’t see ${cfg.owner}/${cfg.repo}. Check the address, and that the token has access to this repo.`
+        : e.message;
+    }
+  });
+  $("#exp").onclick = async () => {
+    const data = JSON.stringify({ app: "vino", version: 1, exported: new Date().toISOString(), bottles: await allBottles() });
+    const blob = new Blob([data], { type: "application/json" });
+    const name = `vino-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([blob], name, { type: "application/json" });
+    if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: "Vino backup" }); return; } catch (e) { if (e.name === "AbortError") return; } }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  };
+  $("#imp").onclick = () => $("#backupInput").click();
+}
+$("#csvInput").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const st = $("#csvStatus"); st.textContent = "Loading…";
+  try {
+    const n = await importWinesCsv(f, (c, p) => { st.textContent = `Loading… ${c.toLocaleString()} wines (${Math.min(100, Math.round(p * 100))}%)`; });
+    toast(`${n.toLocaleString()} wines loaded`); viewMore();
+  } catch (err) { st.textContent = "Couldn't read that file. Pick the X-Wines wines CSV."; }
+};
+$("#backupInput").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data.bottles)) throw new Error();
+    const have = await allBottles() || [];
+    const key = b => norm([b.producer, b.name, b.vintage].join(" "));
+    const ids = new Set(have.map(b => b.id)), keys = new Set(have.map(key));
+    // Same id = restoring a backup (overwrite); same wine + vintage under another id = already in the cellar (skip).
+    const add = data.bottles.filter(b => ids.has(b.id) || !keys.has(key(b)));
+    await tx("bottles", "readwrite", s => { add.forEach(b => s.put({ ...b, dirty: true })); });
+    syncSoon();
+    const skipped = data.bottles.length - add.length;
+    toast(`${add.length} bottle${add.length === 1 ? "" : "s"} imported${skipped ? `, ${skipped} already in your cellar` : ""}`); viewMore();
+  } catch { toast("That file isn't a Vino backup or Vivino import."); }
+};
+
+/* ---------- start ---------- */
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+navigator.storage?.persist?.();
+go("cellar");
+syncSoon();
+</script>
+</body>
+</html>
