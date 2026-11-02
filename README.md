@@ -12,10 +12,13 @@ saves the bottle with your rating and notes. A map shows where your bottles come
 
 Open it once while online and scan one bottle: after that the app and the label reader work offline.
 
-## Load the wine list (optional, recommended)
-Download the X-Wines dataset (Slim = 1k wines, Full = 100k wines) via
-https://github.com/rogerioxavier/X-Wines, unzip it and put the wines CSV in iCloud Drive.
-In the app: More → Load wine list → pick the CSV.
+## Wine list (X-Wines)
+`wines.json` holds about 100,000 wines from the X-Wines dataset, trimmed to the fields Vino uses.
+The app downloads it the first time you scan (about 2 MB), keeps it on the phone, and checks once a day
+whether a newer `wines.json` was pushed.
+
+X-Wines: de Azambuja, R. X., Morais, A. J., & Filipe, V. (2023). X-Wines: A Wine Dataset for Recommender
+Systems and Machine Learning. Big Data and Cognitive Computing, 7(1), 20. https://www.mdpi.com/2504-2289/7/1/20
 
 ## Sync with GitHub (optional)
 Keeps your bottles in a separate **private** repo, so they're backed up and the same on every device.
@@ -35,6 +38,7 @@ Wines already in your cellar (same producer, wine and vintage) are skipped. Labe
 
 ## Files
 - `index.html`: the app
+- `wines.json`: wine list from X-Wines (see above)
 - `dict.js`: region and grape dictionary with map coordinates, add your own entries here
 - `sw.js`: offline support (bump `VERSION` when you change files)
 - `manifest.json`, icons: home-screen app

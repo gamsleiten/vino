@@ -179,7 +179,6 @@ a.link,button.link{color:var(--wine);background:none;border:0;padding:0;text-dec
 <div class="toast" id="toast"></div>
 <div class="update-bar" id="updateBar" role="status"><span>A new version of Vino is ready.</span><span><button id="updateGo">Refresh</button><button class="x" id="updateLater" aria-label="Later">✕</button></span></div>
 <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
-<input type="file" id="csvInput" accept=".csv,text/csv" hidden>
 <input type="file" id="backupInput" accept=".json,application/json" hidden>
 
 <script src="dict.js"></script>
@@ -190,7 +189,6 @@ const CDN = {
   worker: "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js",
   core: "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0",
   lang: "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
-  papa: "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js",
   maplibre: "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js",
   maplibreCss: "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css",
   mapStyle: "https://tiles.openfreemap.org/styles/positron"
@@ -415,16 +413,37 @@ function guessNames(text, regions, grapes) {
   return { producer: title(lines[0] || ""), name: title(lines[1] || "") };
 }
 
-/* ---------- wine database (X-Wines import) ---------- */
+/* ---------- wine list (X-Wines, shipped as wines.json in the app repo) ---------- */
+// Downloaded once and kept on the phone; re-downloaded only when wines.json changes on GitHub.
 let WINES = null;
+const WINE_CHECK_EVERY = 864e5; // look for a new wines.json at most once a day
+async function fetchWineList(force) {
+  const cur = await getMeta("winesFile");
+  if (!force && cur && Date.now() - (cur.checked || 0) < WINE_CHECK_EVERY) return cur;
+  if (!navigator.onLine) return cur;
+  try {
+    const res = await fetch("wines.json", { cache: "no-store", headers: cur?.etag ? { "If-None-Match": cur.etag } : cur?.modified ? { "If-Modified-Since": cur.modified } : {} });
+    if (res.status === 304 && cur) { cur.checked = Date.now(); await setMeta("winesFile", cur); return cur; }
+    if (!res.ok) { if (res.status === 404 && cur) return cur; await setMeta("winesFile", { missing: true, checked: Date.now() }); return null; }
+    const text = await res.text();
+    const count = JSON.parse(text).wines.length;
+    const file = { etag: res.headers.get("ETag") || "", modified: res.headers.get("Last-Modified") || "", text, count, updated: Date.now(), checked: Date.now() };
+    await setMeta("winesFile", file); WINES = null;
+    return file;
+  } catch { return cur; }
+}
 async function loadWines() {
   if (WINES) return WINES;
-  const list = await tx("wines", "readonly", s => s.getAll()) || [];
-  for (const w of list) {
-    w._w = norm(w.winery).split(" ").filter(t => t.length >= 3 && !STOP.has(t));
-    w._n = norm(w.name).split(" ").filter(t => t.length >= 3 && !STOP.has(t));
-  }
-  return (WINES = list);
+  const f = (await getMeta("winesFile"))?.text ? await getMeta("winesFile") : await fetchWineList(true);
+  if (!f?.text) return [];
+  const d = JSON.parse(f.text);
+  WINES = d.wines.map(([id, name, ty, el, gr, pa, abv, bo, ac, rg, wi]) => {
+    const [region, ci] = d.regions[rg], winery = d.wineries[wi];
+    return { id: String(id), name, winery, type: d.type[ty], elaborate: d.elaborate[el], grapes: gr.map(i => d.grapes[i]), pairs: pa.map(i => d.pairs[i]),
+      abv: abv ?? "", body: d.body[bo], acidity: d.acidity[ac], region, country: d.countries[ci],
+      _w: norm(winery).split(" ").filter(t => t.length >= 3 && !STOP.has(t)), _n: norm(name).split(" ").filter(t => t.length >= 3 && !STOP.has(t)) };
+  });
+  return WINES;
 }
 function matchWines(idx, list) {
   const out = [];
@@ -439,39 +458,6 @@ function matchWines(idx, list) {
   }
   out.sort((a, b) => b.score - a.score);
   return out.slice(0, 6).map(o => o.w);
-}
-function parseList(s) {
-  if (!s) return [];
-  try { return JSON.parse(s.replace(/'/g, '"')); } catch { return s.replace(/[\[\]']/g, "").split(",").map(x => x.trim()).filter(Boolean); }
-}
-async function importWinesCsv(file, onProgress) {
-  await loadScript(CDN.papa);
-  await tx("wines", "readwrite", s => s.clear());
-  let count = 0, batch = [];
-  const flush = async () => { const b = batch; batch = []; await tx("wines", "readwrite", s => { b.forEach(w => s.put(w)); }); };
-  await new Promise((res, rej) => {
-    Papa.parse(file, {
-      header: true, skipEmptyLines: true, chunkSize: 1024 * 512,
-      chunk: async (results, parser) => {
-        parser.pause();
-        try {
-          for (const r of results.data) {
-            if (!r.WineID) continue;
-            batch.push({ id: String(r.WineID), name: r.WineName || "", type: r.Type || "", grapes: parseList(r.Grapes), pairs: parseList(r.Harmonize),
-              abv: r.ABV || "", body: r.Body || "", acidity: r.Acidity || "", country: r.Country || "", region: r.RegionName || "", winery: r.WineryName || "", elaborate: r.Elaborate || "" });
-            count++;
-          }
-          await flush();
-          onProgress(count, results.meta.cursor / file.size);
-          parser.resume();
-        } catch (e) { parser.abort(); rej(e); }
-      },
-      complete: () => res(), error: rej
-    });
-  });
-  await setMeta("wineCount", count);
-  WINES = null;
-  return count;
 }
 
 /* ---------- OCR ---------- */
@@ -624,9 +610,12 @@ async function renderDraft(text) {
   const idx = buildOcrIndex(text);
   const regions = text ? detectRegions(idx) : [];
   const grapes = text ? detectGrapes(idx) : [];
-  const wineCount = await getMeta("wineCount") || 0;
-  let wines = [];
-  if (text && wineCount) { out.insertAdjacentHTML("beforeend", `<p class="small muted" id="dbmsg">Searching your wine list…</p>`); wines = matchWines(idx, await loadWines()); }
+  let wines = [], wineCount = 0;
+  if (text) {
+    out.insertAdjacentHTML("beforeend", `<p class="small muted" id="dbmsg">Searching the wine list…</p>`);
+    const list = await loadWines(); wineCount = list.length;
+    if (wineCount) wines = matchWines(idx, list);
+  }
   const guess = guessNames(text, regions, grapes);
   const r0 = regions[0];
   Object.assign(draft, {
@@ -646,7 +635,7 @@ async function renderDraft(text) {
       <button class="match" data-wid="${esc(w.id)}"><div class="t">${esc(w.name)}</div>
       <div class="small muted">${esc(w.winery)}, ${esc(w.region)}, ${esc(w.country)}</div>
       <div class="small">${esc(w.type)}${w.grapes?.length ? ": " + esc(w.grapes.join(", ")) : ""}</div></button>`).join("")}` : ""}
-    ${text && !wines.length && wineCount ? `<p class="small muted">No exact wine found in your wine list. The details below come from the region and grape dictionary.</p>` : ""}
+    ${text && !wines.length && wineCount ? `<p class="small muted">No exact wine found in the wine list. The details below come from the region and grape dictionary.</p>` : ""}
     ${regions.length > 1 ? `<h3>Region</h3><div class="chips">${regions.map(r => `<button class="chip" data-region="${esc(r.name)}">${esc(r.name)}</button>`).join("")}</div>` : ""}
     <h2>Details</h2>
     <div id="form"></div>`;
@@ -871,17 +860,17 @@ function viewDict() {
 
 /* ---------- more ---------- */
 async function viewMore() {
-  const wc = await getMeta("wineCount") || 0;
+  const wf = await getMeta("winesFile");
   const bottles = await allBottles() || [];
   const sync = await getMeta("sync"), last = await getMeta("lastSync");
   const pending = bottles.filter(b => b.dirty).length + Object.keys(await getMeta("tombstones") || {}).length;
   $("#view").innerHTML = `
     <h1>More</h1>
     <h2>Wine list</h2>
-    <p>${wc ? `${wc.toLocaleString()} wines loaded. Scans are matched against this list first.` : "No wine list loaded yet. Scans use the region and grape dictionary only."}</p>
-    <p class="small muted">Load the wines CSV from the X-Wines dataset (Slim or Full version, the file with “wines” in its name). It stays on this phone.</p>
-    <div class="row"><button class="btn ghost" id="loadCsv">${wc ? "Replace wine list" : "Load wine list"}</button></div>
-    <p id="csvStatus" class="small muted"></p>
+    <p>${wf?.count ? `${wf.count.toLocaleString()} wines from X-Wines on this phone. Scans are matched against them first.`
+      : wf?.missing ? "No wines.json found in the app’s repo. Scans use the region and grape dictionary only."
+      : "The wine list downloads the first time you scan (about 2 MB)."}</p>
+    ${wf?.count ? `<p class="small muted">Checked for a newer version ${new Date(wf.checked).toLocaleDateString(undefined, { dateStyle: "medium" })}.</p>` : ""}
     <h2>Sync with GitHub</h2>
     ${sync?.token ? `
       <p>Saving to <a class="link" href="https://github.com/${esc(sync.owner)}/${esc(sync.repo)}" target="_blank" rel="noopener">github.com/${esc(sync.owner)}/${esc(sync.repo)}</a>. ${pending ? `${pending} change${pending === 1 ? "" : "s"} waiting.` : "All changes are saved there."}</p>
@@ -907,7 +896,6 @@ async function viewMore() {
     <div class="row"><button class="btn quiet" id="checkUpd">Check for updates</button></div>
     <h2>About</h2>
     <p class="small muted">Label reading runs on your phone with Tesseract. Bottles are stored on this phone, and in your own private GitHub repo if sync is on. Wine data: X-Wines, de Azambuja, Morais &amp; Filipe (2023), Big Data and Cognitive Computing 7(1), 20.</p>`;
-  $("#loadCsv").onclick = () => $("#csvInput").click();
   appVersion().then(v => { const el = $("#appVersion"); if (el) el.textContent = v || "not installed"; });
   $("#checkUpd").onclick = () => {
     const c = navigator.serviceWorker?.controller;
@@ -950,14 +938,6 @@ async function viewMore() {
   };
   $("#imp").onclick = () => $("#backupInput").click();
 }
-$("#csvInput").onchange = async e => {
-  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-  const st = $("#csvStatus"); st.textContent = "Loading…";
-  try {
-    const n = await importWinesCsv(f, (c, p) => { st.textContent = `Loading… ${c.toLocaleString()} wines (${Math.min(100, Math.round(p * 100))}%)`; });
-    toast(`${n.toLocaleString()} wines loaded`); viewMore();
-  } catch (err) { st.textContent = "Couldn't read that file. Pick the X-Wines wines CSV."; }
-};
 $("#backupInput").onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   try {
@@ -997,6 +977,7 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || location.
 navigator.storage?.persist?.();
 go("cellar");
 syncSoon();
+setTimeout(() => getMeta("winesFile").then(f => { if (f?.text || f?.missing) fetchWineList(); }), 4000); // keep the wine list current
 </script>
 </body>
 </html>
