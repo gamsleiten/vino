@@ -218,3 +218,32 @@ window.VINO_GRAPES = [
   };
   for (const r of window.VINO_REGIONS) if (map[r.name]) r.chart = map[r.name];
 })();
+
+// Wine areas: the larger region each entry belongs to (used for the area bubbles under a country).
+(() => {
+  const Z = {
+    "Veneto": ["Bardolino", "Valpolicella", "Valpolicella Ripasso", "Amarone della Valpolicella", "Soave", "Prosecco", "Pinot Grigio delle Venezie"],
+    "Lombardy": ["Lugana", "Franciacorta", "Valtellina"],
+    "Piedmont": ["Barolo", "Barbaresco", "Langhe Nebbiolo", "Barbera d'Asti", "Dolcetto", "Monferrato"],
+    "Tuscany": ["Chianti", "Brunello di Montalcino", "Vino Nobile di Montepulciano", "Bolgheri", "Toscana"],
+    "Trentino-Alto Adige": ["Alto Adige"], "Valle d'Aosta": ["Valle d'Aosta"], "Friuli": ["Friuli"],
+    "Umbria": ["Umbria"], "Marche": ["Marche"], "Abruzzo": ["Montepulciano d'Abruzzo"],
+    "Puglia": ["Primitivo di Manduria", "Puglia"], "Sicily": ["Sicilia", "Etna"], "Sardinia": ["Vermentino di Sardegna"],
+    "Bordeaux": ["Bordeaux", "Saint-Émilion", "Sauternes"], "Burgundy": ["Bourgogne", "Chablis", "Crémant de Bourgogne"],
+    "Beaujolais": ["Beaujolais"], "Rhône": ["Côtes du Rhône", "Châteauneuf-du-Pape", "Hermitage"],
+    "Loire": ["Sancerre", "Vouvray", "Muscadet", "Chinon", "Crémant de Loire"], "Alsace": ["Alsace", "Crémant d'Alsace"],
+    "Champagne": ["Champagne"], "Provence": ["Côtes de Provence"], "Languedoc-Roussillon": ["Languedoc"],
+    "South West": ["Irouléguy"], "Savoie": ["Savoie"],
+    "Rioja": ["Rioja"], "Castilla y León": ["Ribera del Duero", "Rueda"], "Catalonia": ["Priorat", "Cava"],
+    "Galicia": ["Rías Baixas", "Valdeorras"], "Andalusia": ["Jerez"], "Aragón": ["Somontano", "Campo de Borja"],
+    "Valencia": ["Utiel-Requena"], "Castilla-La Mancha": ["Castilla"],
+    "Douro": ["Douro", "Porto"], "Minho": ["Vinho Verde"], "Alentejo": ["Alentejo"], "Lisboa": ["Lisboa"], "Setúbal": ["Península de Setúbal"],
+    "Mosel": ["Mosel"], "Rheingau": ["Rheingau"], "Pfalz": ["Pfalz"], "Lower Austria": ["Wachau", "Carnuntum"],
+    "California": ["Napa Valley", "Sonoma", "Lodi"], "Oregon": ["Willamette Valley"],
+    "Mendoza": ["Mendoza"], "San Juan": ["San Juan"], "Central Valley": ["Valle Central"],
+    "South Australia": ["Barossa Valley"], "Marlborough": ["Marlborough"], "Central Otago": ["Central Otago"],
+    "Western Cape": ["Stellenbosch"], "Struma Valley": ["Melnik"], "Thracian Valley": ["Thracian Valley"]
+  };
+  const byName = {}; for (const [z, names] of Object.entries(Z)) names.forEach(n => byName[n] = z);
+  for (const r of window.VINO_REGIONS) r.zone = byName[r.name] || r.name;
+})();

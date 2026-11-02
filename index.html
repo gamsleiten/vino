@@ -128,6 +128,10 @@ a.link,button.link{color:var(--wine);background:none;border:0;padding:0;text-dec
 .fchip span{color:var(--muted);font-size:.8rem;margin-left:2px}
 .fchip[aria-pressed="true"]{background:var(--wine);border-color:var(--wine);color:var(--on-wine);font-weight:600}
 .fchip[aria-pressed="true"] span{color:var(--on-wine);opacity:.8}
+.chip-row.zones{padding-top:0;margin-top:-2px}
+.fchip.sub{font-size:.85rem;padding:5px 12px;background:none}
+.fchip.sub[aria-pressed="true"]{background:var(--wine-soft);border-color:var(--wine);color:var(--wine)}
+.fchip.sub[aria-pressed="true"] span{color:var(--wine)}
 .dict-item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 0}
 .dict-item .t{font:600 1.25rem/1.15 var(--serif)}
 .country{font:500 italic 1.1rem var(--serif);color:var(--vine);margin:18px 0 0}
@@ -564,9 +568,11 @@ const COLORS = [
 const colorGroup = b => ["Red", "White", "Rosé"].includes(b.color) ? b.color : "Other"; // Other = sparkling, sweet, fortified, unknown
 async function viewCellar() {
   const list = (await allBottles() || []).sort((a, b) => b.created - a.created);
-  const q = viewCellar.q || "", col = viewCellar.col || "Red", ctry = viewCellar.ctry || "";
+  const q = viewCellar.q || "", col = viewCellar.col || "Red", ctry = viewCellar.ctry || "", zone = ctry ? viewCellar.zone || "" : "";
+  const zoneOf = b => findRegion(b.region)?.zone || "Other areas";
   const searched = q ? list.filter(b => norm([b.producer, b.name, b.region, b.country, (b.grapes || []).join(" "), b.vintage].join(" ")).includes(norm(q))) : list;
-  const hits = ctry ? searched.filter(b => b.country === ctry) : searched;
+  const inCtry = ctry ? searched.filter(b => b.country === ctry) : searched;
+  const hits = zone ? inCtry.filter(b => zoneOf(b) === zone) : inCtry;
   const count = k => hits.filter(b => colorGroup(b) === k).length;
   const shown = hits.filter(b => colorGroup(b) === col);
   // Country bubbles for the chosen colour (and search), most bottles first.
@@ -574,6 +580,8 @@ async function viewCellar() {
   inCol.forEach(b => { if (b.country) cc[b.country] = (cc[b.country] || 0) + 1; });
   const ctryList = Object.keys(cc).sort((a, b) => cc[b] - cc[a] || a.localeCompare(b));
   if (ctry && !cc[ctry]) ctryList.unshift(ctry);
+  const inColCtry = inCol.filter(b => b.country === ctry), zc = {};
+  inColCtry.forEach(b => { const z = zoneOf(b); zc[z] = (zc[z] || 0) + 1; });
   const elsewhere = (q || ctry) && !shown.length ? COLORS.filter(c => c.key !== col && count(c.key)) : [];
   $("#view").innerHTML = `
     <h1>Cellar</h1>
@@ -583,7 +591,8 @@ async function viewCellar() {
       <button role="tab" data-col="${c.key}" aria-selected="${c.key === col}" aria-pressed="${c.key === col}"><i style="background:${c.dot}"></i>${c.key}<span class="n">${count(c.key)}</span></button>`).join("")}</div>
     ${ctryList.length > 1 || ctry ? `<div class="chip-row" role="group" aria-label="Country">
       <button class="fchip" data-ctry="" aria-pressed="${!ctry}">All <span>${inCol.length}</span></button>
-      ${ctryList.map(c => `<button class="fchip" data-ctry="${esc(c)}" aria-pressed="${c === ctry}">${esc(c)} <span>${cc[c] || 0}</span></button>`).join("")}</div>` : ""}` : ""}
+      ${ctryList.map(c => `<button class="fchip" data-ctry="${esc(c)}" aria-pressed="${c === ctry}">${esc(c)} <span>${cc[c] || 0}</span></button>`).join("")}</div>` : ""}
+    ${ctry ? zoneRow(zc, inColCtry.length, zone, "data-zone") : ""}` : ""}
     <div id="list">${shown.map(b => `
       <button class="bottle" data-id="${b.id}">
         ${b.thumb ? `<img src="${b.thumb}" alt="" loading="lazy" onerror="this.outerHTML='<div class=ph></div>'">` : `<div class="ph"></div>`}
@@ -598,13 +607,15 @@ async function viewCellar() {
       </button>`).join("")}</div>
     ${!list.length ? `<div class="empty"><div class="big">Take a photo of a label to start</div><p class="muted">Vino reads the label, looks up the region and grapes, and saves the bottle with your notes.</p><button class="btn" id="startScan">Scan a bottle</button></div>` : ""}
     ${list.length && !shown.length ? (elsewhere.length
-      ? `<p class="muted">No ${col === "Other" ? "other" : col.toLowerCase()} wines ${q ? `match “${esc(q)}”` : `from ${esc(ctry)}`}. ${elsewhere.map(c => `<button class="link" data-col="${c.key}">${count(c.key)} in ${c.key}</button>`).join(", ")}</p>`
+      ? `<p class="muted">No ${col === "Other" ? "other" : col.toLowerCase()} wines ${q ? `match “${esc(q)}”` : `from ${esc(zone || ctry)}`}. ${elsewhere.map(c => `<button class="link" data-col="${c.key}">${count(c.key)} in ${c.key}</button>`).join(", ")}</p>`
       : `<p class="muted">${q ? `No bottles match “${esc(q)}”${ctry ? ` in ${esc(ctry)}` : ""}.` : `No ${col === "Other" ? "other" : col.toLowerCase()} wines${ctry ? ` from ${esc(ctry)}` : ""} yet.`}</p>`) : ""}`;
   const crow = $(".chip-row"); if (crow) { crow.scrollLeft = viewCellar.cscroll || 0; crow.onscroll = () => viewCellar.cscroll = crow.scrollLeft; }
+  const zrow = $(".chip-row.zones"); if (zrow) { zrow.scrollLeft = viewCellar.zscroll || 0; zrow.onscroll = () => viewCellar.zscroll = zrow.scrollLeft; }
   $("#startScan")?.addEventListener("click", () => go("scan"));
   const cq = $("#cq"); if (cq) cq.oninput = () => { viewCellar.q = cq.value; const pos = cq.selectionStart; viewCellar().then(() => { const n = $("#cq"); n.focus(); n.setSelectionRange(pos, pos); }); };
   document.querySelectorAll("[data-col]").forEach(el => el.onclick = () => { viewCellar.col = el.dataset.col; viewCellar(); });
-  document.querySelectorAll(".fchip").forEach(el => el.onclick = () => { viewCellar.ctry = el.dataset.ctry === ctry ? "" : el.dataset.ctry; viewCellar(); });
+  document.querySelectorAll(".fchip[data-ctry]").forEach(el => el.onclick = () => { const c = el.dataset.ctry === ctry ? "" : el.dataset.ctry; if (c !== ctry) { viewCellar.zone = ""; viewCellar.zscroll = 0; } viewCellar.ctry = c; viewCellar(); });
+  document.querySelectorAll(".fchip[data-zone]").forEach(el => el.onclick = () => { viewCellar.zone = el.dataset.zone === zone ? "" : el.dataset.zone; viewCellar(); });
   document.querySelectorAll(".bottle").forEach(el => el.onclick = () => go("bottle", el.dataset.id));
 }
 
@@ -879,9 +890,19 @@ function bindDictLinks(root) {
   root.querySelectorAll("[data-open-grape]").forEach(el => el.onclick = () => { openSheet(grapeHtml(findGrape(el.dataset.openGrape))); bindDictLinks($("#sheetInner")); });
 }
 // Countries where a grape is grown, taken from the regions that list it.
-const grapeCountries = g => new Set(REGIONS.filter(r => r.grapes.some(x => findGrape(x) === g)).map(r => r.country));
+const grapeRegions = g => REGIONS.filter(r => r.grapes.some(x => findGrape(x) === g));
+const grapeCountries = g => new Set(grapeRegions(g).map(r => r.country));
+// Second bubble row: wine areas within the chosen country.
+function zoneRow(counts, total, zone, attr) {
+  const zs = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  if (zone && !counts[zone]) zs.unshift(zone);
+  if (zs.length < 2 && !zone) return "";
+  return `<div class="chip-row zones" role="group" aria-label="Area">
+    <button class="fchip sub" ${attr}="" aria-pressed="${!zone}">All <span>${total}</span></button>
+    ${zs.map(z => `<button class="fchip sub" ${attr}="${esc(z)}" aria-pressed="${z === zone}">${esc(z)} <span>${counts[z] || 0}</span></button>`).join("")}</div>`;
+}
 function viewDict() {
-  const mode = viewDict.mode || "regions", q = viewDict.q || "", ctry = viewDict.ctry || "";
+  const mode = viewDict.mode || "regions", q = viewDict.q || "", ctry = viewDict.ctry || "", zone = ctry ? viewDict.zone || "" : "";
   const nq = norm(q);
   const matchQ = mode === "regions"
     ? r => !nq || norm([r.name, ...r.aliases, r.country, r.area, ...r.grapes].join(" ")).includes(nq)
@@ -891,7 +912,10 @@ function viewDict() {
   // Country chips, biggest first, with counts for the current search.
   const counts = {}; for (const x of items) for (const c of countriesOf(x)) counts[c] = (counts[c] || 0) + 1;
   const all = [...new Set(REGIONS.map(r => r.country))].sort((a, b) => REGIONS.filter(r => r.country === b).length - REGIONS.filter(r => r.country === a).length || a.localeCompare(b));
-  const list = ctry ? items.filter(x => countriesOf(x).has(ctry)) : items;
+  const inCtry = ctry ? items.filter(x => countriesOf(x).has(ctry)) : items;
+  const zonesOf = x => new Set((mode === "regions" ? [x] : grapeRegions(x)).filter(r => r.country === ctry).map(r => r.zone));
+  const zc = {}; if (ctry) for (const x of inCtry) for (const z of zonesOf(x)) zc[z] = (zc[z] || 0) + 1;
+  const list = zone ? inCtry.filter(x => zonesOf(x).has(zone)) : inCtry;
   let body = "";
   if (mode === "regions") {
     const byC = {}; list.forEach(r => (byC[r.country] ??= []).push(r));
@@ -900,7 +924,7 @@ function viewDict() {
   } else {
     body = list.sort((a, b) => a.name.localeCompare(b.name)).map(g => `<button class="dict-item" data-open-grape="${esc(g.name)}"><div class="t">${esc(g.name)}</div><div class="small muted">${esc(g.color)}${g.aliases.length ? `, also ${esc(g.aliases.join(", "))}` : ""}</div></button>`).join("");
   }
-  const prevScroll = $(".chip-row")?.scrollLeft || 0;
+  const prevScroll = $(".chip-row")?.scrollLeft || 0, prevZScroll = $(".chip-row.zones")?.scrollLeft || 0;
   $("#view").innerHTML = `
     <h1>Dictionary</h1>
     <div class="seg" role="group" aria-label="Show"><button data-mode="regions" aria-pressed="${mode === "regions"}">Regions</button><button data-mode="grapes" aria-pressed="${mode === "grapes"}">Grapes</button></div>
@@ -908,12 +932,15 @@ function viewDict() {
       <button class="fchip" data-ctry="" aria-pressed="${!ctry}">All <span>${items.length}</span></button>
       ${all.filter(c => counts[c] || c === ctry).map(c => `<button class="fchip" data-ctry="${esc(c)}" aria-pressed="${c === ctry}">${esc(c)} <span>${counts[c] || 0}</span></button>`).join("")}
     </div>
+    ${ctry ? zoneRow(zc, inCtry.length, zone, "data-zone") : ""}
     <input type="search" id="dq" placeholder="${mode === "regions" ? "Bardolino, Rioja, Merlot…" : "Corvina, Shiraz, white…"}" value="${esc(q)}">
     <div>${body || `<p class="muted" style="margin-top:16px">Nothing found${q ? ` for “${esc(q)}”` : ""}${ctry ? ` in ${esc(ctry)}` : ""}.</p>`}</div>`;
   const row = $(".chip-row"); row.scrollLeft = prevScroll;
   row.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const zrow = $(".chip-row.zones"); if (zrow) zrow.scrollLeft = prevZScroll;
   document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { viewDict.mode = b.dataset.mode; viewDict.q = ""; viewDict(); });
-  document.querySelectorAll(".fchip").forEach(b => b.onclick = () => { viewDict.ctry = b.dataset.ctry === ctry ? "" : b.dataset.ctry; viewDict(); });
+  document.querySelectorAll(".fchip[data-ctry]").forEach(b => b.onclick = () => { const c = b.dataset.ctry === ctry ? "" : b.dataset.ctry; if (c !== ctry) { viewDict.zone = ""; $(".chip-row.zones")?.remove(); } viewDict.ctry = c; viewDict(); });
+  document.querySelectorAll(".fchip[data-zone]").forEach(b => b.onclick = () => { viewDict.zone = b.dataset.zone === zone ? "" : b.dataset.zone; viewDict(); });
   const dq = $("#dq"); dq.oninput = () => { viewDict.q = dq.value; const p = dq.selectionStart; viewDict(); const n = $("#dq"); n.focus(); n.setSelectionRange(p, p); };
   bindDictLinks($("#view"));
 }
