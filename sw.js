@@ -2,7 +2,7 @@
 // - App files: stale-while-revalidate. Start instantly from the stored copy, check GitHub Pages
 //   in the background, and tell the app when a newer version is ready (it shows a Refresh bar).
 // - Pinned libraries and fonts: cache first, they never change.
-const VERSION = "vino-v18";
+const VERSION = "vino-v19";
 const SHELL = ["./", "index.html", "dict.js", "manifest.json", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const TEXT = /\.(html|js|json)$|\/$/;
 
@@ -15,7 +15,7 @@ self.addEventListener("activate", e => {
     const old = (await caches.keys()).filter(k => k !== VERSION && k !== "vino-cdn");
     await Promise.all(old.map(k => caches.delete(k)));
     await self.clients.claim();
-    if (old.length) notify("vino-update"); // a new worker replaced an older version
+    // No message here: the file check already announced this update, so a second bar would be a duplicate.
   })());
 });
 
