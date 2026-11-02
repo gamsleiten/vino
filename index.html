@@ -58,11 +58,17 @@ nav.tabs .scan span{display:none}
 nav.tabs .scan svg{width:28px;height:28px}
 
 /* cellar list */
-.bottle{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);
+.bottle{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);
   background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left}
 .bottle img,.bottle .ph{width:64px;height:84px;object-fit:cover;border-radius:6px;background:var(--wine-soft)}
 .bottle .name{font:600 1.35rem/1.1 var(--serif)}
 .bottle .meta{font-size:.85rem;color:var(--muted)}
+.bottle .side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;align-self:start;padding-top:4px;min-width:38px}
+.bottle .viv{text-align:right;line-height:1}
+.bottle .viv b{display:block;font:600 1.3rem/1 var(--serif);color:var(--ink)}
+.bottle .viv small{font-size:.68rem;color:var(--muted);letter-spacing:.02em}
+.bottle .chart{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--wine-soft);color:var(--wine)}
+.bottle .chart svg{width:15px;height:15px}
 .stars-static{color:var(--wine);font-size:.85rem;letter-spacing:1px}
 .empty{padding:40px 8px;text-align:center}
 .empty .big{font:500 1.6rem/1.2 var(--serif);margin-bottom:8px}
@@ -110,6 +116,12 @@ a.link,button.link{color:var(--wine);background:none;border:0;padding:0;text-dec
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface);margin:10px 0}
 .seg button{border:0;background:none;padding:6px 16px;border-radius:999px;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--wine);color:var(--on-wine);font-weight:600}
+.seg.colors{display:flex;width:100%;margin:10px 0 4px}
+.seg.colors button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 4px;font-size:.88rem;white-space:nowrap}
+.seg.colors i{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.seg.colors .n{font-size:.75rem;opacity:.75}
+.seg.colors button[aria-pressed="true"] .n{opacity:.9}
+.seg.colors button[aria-pressed="true"] i{box-shadow:0 0 0 1.5px var(--on-wine)}
 .dict-item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 0}
 .dict-item .t{font:600 1.25rem/1.15 var(--serif)}
 .country{font:500 italic 1.1rem var(--serif);color:var(--vine);margin:18px 0 0}
@@ -143,6 +155,11 @@ a.link,button.link{color:var(--wine);background:none;border:0;padding:0;text-dec
 .toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);
   padding:8px 16px;border-radius:999px;font-size:.9rem;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
+.update-bar{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:45;display:none;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--ink);color:var(--paper);border-radius:14px;padding:10px 10px 10px 16px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:.95rem}
+.update-bar.show{display:flex}
+.update-bar button{border:0;border-radius:999px;padding:8px 16px;font-weight:600;background:var(--wine);color:var(--on-wine)}
+.update-bar .x{background:none;color:var(--paper);padding:8px 10px;opacity:.7}
 @media (prefers-reduced-motion: reduce){.sheet{transition:none}.progress i{transition:none}}
 </style>
 </head>
@@ -160,6 +177,7 @@ a.link,button.link{color:var(--wine);background:none;border:0;padding:0;text-dec
 <div class="sheet-back" id="sheetBack"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="sheet-inner" id="sheetInner"></div></div>
 <div class="toast" id="toast"></div>
+<div class="update-bar" id="updateBar" role="status"><span>A new version of Vino is ready.</span><span><button id="updateGo">Refresh</button><button class="x" id="updateLater" aria-label="Later">✕</button></span></div>
 <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
 <input type="file" id="backupInput" accept=".json,application/json" hidden>
@@ -522,26 +540,42 @@ function go(tab, arg) {
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => go(b.dataset.tab));
 
 /* ---------- cellar ---------- */
+const COLORS = [
+  { key: "Red", dot: "#7B1E30" }, { key: "White", dot: "#E2CF7A" }, { key: "Rosé", dot: "#E9A2B0" }, { key: "Other", dot: "#9AA38A" }
+];
+const colorGroup = b => ["Red", "White", "Rosé"].includes(b.color) ? b.color : "Other"; // Other = sparkling, sweet, fortified, unknown
 async function viewCellar() {
   const list = (await allBottles() || []).sort((a, b) => b.created - a.created);
-  const q = viewCellar.q || "";
-  const shown = q ? list.filter(b => norm([b.producer, b.name, b.region, b.country, (b.grapes || []).join(" "), b.vintage].join(" ")).includes(norm(q))) : list;
+  const q = viewCellar.q || "", col = viewCellar.col || "Red";
+  const hits = q ? list.filter(b => norm([b.producer, b.name, b.region, b.country, (b.grapes || []).join(" "), b.vintage].join(" ")).includes(norm(q))) : list;
+  const count = k => hits.filter(b => colorGroup(b) === k).length;
+  const shown = hits.filter(b => colorGroup(b) === col);
+  const elsewhere = q && !shown.length ? COLORS.filter(c => c.key !== col && count(c.key)) : [];
   $("#view").innerHTML = `
     <h1>Cellar</h1>
     <p class="muted">${list.length ? `${list.length} bottle${list.length === 1 ? "" : "s"} tasted` : "Bottles you scan end up here."}</p>
-    ${list.length ? `<input type="search" id="cq" placeholder="Search producer, region, grape…" value="${esc(q)}">` : ""}
+    ${list.length ? `<input type="search" id="cq" placeholder="Search producer, region, grape…" value="${esc(q)}">
+    <div class="seg colors" role="tablist" aria-label="Wine type">${COLORS.map(c => `
+      <button role="tab" data-col="${c.key}" aria-selected="${c.key === col}" aria-pressed="${c.key === col}"><i style="background:${c.dot}"></i>${c.key}<span class="n">${count(c.key)}</span></button>`).join("")}</div>` : ""}
     <div id="list">${shown.map(b => `
       <button class="bottle" data-id="${b.id}">
-        ${b.thumb ? `<img src="${b.thumb}" alt="" loading="lazy">` : `<div class="ph"></div>`}
+        ${b.thumb ? `<img src="${b.thumb}" alt="" loading="lazy" onerror="this.outerHTML='<div class=ph></div>'">` : `<div class="ph"></div>`}
         <div><div class="name">${esc(b.name || b.producer || "Unnamed bottle")}</div>
         <div class="meta">${esc([b.name ? b.producer : "", b.vintage].filter(Boolean).join(", "))}</div>
-        <div class="meta">${esc([b.region, b.country].filter(Boolean).join(", "))}</div>
+        <div class="meta">${esc([b.region, b.country].filter(Boolean).join(", "))}${col === "Other" && b.color ? ` · ${esc(b.color)}` : ""}</div>
         ${b.rating ? `<div class="stars-static" aria-label="${b.rating} of 5">${starsText(b.rating)}</div>` : ""}</div>
+        <div class="side">
+          ${b.vivino?.avg ? `<div class="viv" aria-label="Vivino ${b.vivino.avg.toFixed(1)}"><b>${b.vivino.avg.toFixed(1)}</b><small>Vivino</small></div>` : ""}
+          ${findRegion(b.region)?.chart ? `<div class="chart" title="Vintage chart available" aria-label="Vintage chart available"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="9" width="3" height="5" rx="1"/><rect x="6.5" y="5" width="3" height="9" rx="1"/><rect x="11" y="2" width="3" height="12" rx="1"/></svg></div>` : ""}
+        </div>
       </button>`).join("")}</div>
     ${!list.length ? `<div class="empty"><div class="big">Take a photo of a label to start</div><p class="muted">Vino reads the label, looks up the region and grapes, and saves the bottle with your notes.</p><button class="btn" id="startScan">Scan a bottle</button></div>` : ""}
-    ${list.length && !shown.length ? `<p class="muted">No bottles match “${esc(q)}”.</p>` : ""}`;
+    ${list.length && !shown.length ? (elsewhere.length
+      ? `<p class="muted">No ${col === "Other" ? "other" : col.toLowerCase()} wines match “${esc(q)}”. ${elsewhere.map(c => `<button class="link" data-col="${c.key}">${count(c.key)} in ${c.key}</button>`).join(", ")}</p>`
+      : `<p class="muted">${q ? `No bottles match “${esc(q)}”.` : `No ${col === "Other" ? "other" : col.toLowerCase()} wines yet.`}</p>`) : ""}`;
   $("#startScan")?.addEventListener("click", () => go("scan"));
   const cq = $("#cq"); if (cq) cq.oninput = () => { viewCellar.q = cq.value; const pos = cq.selectionStart; viewCellar().then(() => { const n = $("#cq"); n.focus(); n.setSelectionRange(pos, pos); }); };
+  document.querySelectorAll("[data-col]").forEach(el => el.onclick = () => { viewCellar.col = el.dataset.col; viewCellar(); });
   document.querySelectorAll(".bottle").forEach(el => el.onclick = () => go("bottle", el.dataset.id));
 }
 
@@ -868,9 +902,18 @@ async function viewMore() {
     <p>${sync?.token ? `A single file with all ${bottles.length} bottles, for an extra copy outside GitHub.` : `Your ${bottles.length} bottle${bottles.length === 1 ? "" : "s"} live only on this phone. Save a backup now and then, for example to iCloud Drive.`}</p>
     <div class="row"><button class="btn ghost" id="exp">Save backup</button><button class="btn quiet" id="imp">Import file</button></div>
     <p class="small muted">Import takes a Vino backup or a Vivino import file. Wines already in your cellar are skipped.</p>
+    <h2>App</h2>
+    <p class="small muted">Version <span id="appVersion">…</span>. Vino starts from the copy on this phone and checks for a newer version in the background.</p>
+    <div class="row"><button class="btn quiet" id="checkUpd">Check for updates</button></div>
     <h2>About</h2>
     <p class="small muted">Label reading runs on your phone with Tesseract. Bottles are stored on this phone, and in your own private GitHub repo if sync is on. Wine data: X-Wines, de Azambuja, Morais &amp; Filipe (2023), Big Data and Cognitive Computing 7(1), 20.</p>`;
   $("#loadCsv").onclick = () => $("#csvInput").click();
+  appVersion().then(v => { const el = $("#appVersion"); if (el) el.textContent = v || "not installed"; });
+  $("#checkUpd").onclick = () => {
+    const c = navigator.serviceWorker?.controller;
+    if (!c || !navigator.onLine) { toast(navigator.onLine ? "Updates work in the installed app." : "Offline. Try again later."); return; }
+    toast("Checking…"); checkingUpdate = true; c.postMessage({ type: "check" });
+  };
   $("#syncNow")?.addEventListener("click", () => syncNow(true).catch(() => {}));
   $("#syncOff")?.addEventListener("click", async () => {
     if (!confirm("Stop syncing? Your bottles stay on this phone and in the repo.")) return;
@@ -932,8 +975,25 @@ $("#backupInput").onchange = async e => {
   } catch { toast("That file isn't a Vino backup or Vivino import."); }
 };
 
+/* ---------- updates ---------- */
+let checkingUpdate = false;
+function appVersion() {
+  const c = navigator.serviceWorker?.controller;
+  if (!c) return Promise.resolve(null);
+  return new Promise(res => { const ch = new MessageChannel(); ch.port1.onmessage = e => res(e.data.version); c.postMessage({ type: "version" }, [ch.port2]); setTimeout(() => res(null), 1500); });
+}
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", e => {
+    if (e.data?.type === "vino-update") $("#updateBar").classList.add("show");
+    if (e.data?.type === "vino-current" && checkingUpdate) toast("Vino is up to date");
+    checkingUpdate = false;
+  });
+}
+$("#updateGo").onclick = () => location.reload();
+$("#updateLater").onclick = () => $("#updateBar").classList.remove("show");
+
 /* ---------- start ---------- */
-if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
 navigator.storage?.persist?.();
 go("cellar");
 syncSoon();
